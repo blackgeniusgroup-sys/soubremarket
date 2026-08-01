@@ -1,0 +1,52 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "main": "postcss.config.js",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.109.0",
+    "autoprefixer": "^10.5.4",
+    "baseline-browser-mapping": "^2.11.6",
+    "browserslist": "^4.28.7",
+    "caniuse-lite": "^1.0.30001806",
+    "cookie": "^1.1.1",
+    "electron-to-chromium": "^1.5.398",
+    "escalade": "^3.2.0",
+    "express": "^5.2.1",
+    "fraction.js": "^5.3.4",
+    "iceberg-js": "^0.8.1",
+    "leaflet": "^1.9.4",
+    "nanoid": "^3.3.16",
+    "node-releases": "^2.0.51",
+    "picocolors": "^1.1.1",
+    "postcss": "^8.5.24",
+    "postcss-value-parser": "^4.2.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-leaflet": "^5.0.0",
+    "react-router": "^7.11.0",
+    "react-router-dom": "^7.11.0",
+    "react-scripts": "^0.0.0",
+    "scheduler": "^0.27.0",
+    "set-cookie-parser": "^2.7.2",
+    "source-map-js": "^1.2.1",
+    "tailwindcss": "^4.3.3",
+    "tslib": "^2.8.1",
+    "update-browserslist-db": "^1.2.3"
+  },
+  "scripts": {
+    "start": "NODE_OPTIONS=--openssl-legacy-provider react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "browserslist": [
+    ">0.2%",
+    "not dead",
+    "not ie <= 11",
+    "not op_mini all"
+  ]
+}
