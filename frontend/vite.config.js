@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [
     react({
       // Force Vite à utiliser le nouveau JSX runtime (comme CRA)
-      jsxRuntime: 'automatic',
-    }),
-  ],
+      jsxRuntime: 'automatic'
+    })
+  ]
 })
