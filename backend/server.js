@@ -1,19 +1,28 @@
- const express   = require("express");
+require("dotenv").config(); // Charge les variables d'environnement depuis le fichier .env
+const express   = require("express");
 const cors      = require("cors");
 const helmet    = require("helmet");
 const app       = express();
 app.set("trust proxy", 1); // Pour Heroku et autres proxys
-require("dotenv").config(); // Charge les variables d'environnement depuis le fichier .env
 
 const { apiLimiter } = require("./middleware/rateLimit");
 
 // Sécurité & middlewares
-app.use(cors({ origin: [
-                     "http://localhost:5173",
-                     "http://localhost:5174", 
-                     process.env.CLIENT_URL
-                    ].filter(Boolean),
-                      credentials: true })); 
+// Remplacez votre app.use(cors(...)) actuel par ce bloc dynamique
+app.use(cors({
+  origin: function (origin, callback) {
+    // Si la requête vient d'un navigateur (origin existe)
+    if (origin) {
+      // On autorise toutes les extensions de votre projet (localhost ou vos domaines vercel)
+      if (origin.startsWith('http://localhost') || origin.includes('vercel.app')) {
+        return callback(null, true);
+      }
+    }
+    // Autorise aussi les requêtes sans origine (comme Postman ou les outils serveurs)
+    callback(null, true);
+  },
+  credentials: true
+})); 
 app.use(helmet());                    
 app.use(express.json({ limit: "5mb" }));
 app.use("/api/", apiLimiter);
