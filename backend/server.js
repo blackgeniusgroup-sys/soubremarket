@@ -15,7 +15,7 @@ app.use(cors({
     if (origin) {
       // On autorise toutes les extensions de votre projet (localhost ou vos domaines vercel)
       if (origin.startsWith('http://localhost') || origin.includes('vercel.app')) {
-        return callback(null, true);
+       return callback(null, true);
       }
     }
     // Autorise aussi les requêtes sans origine (comme Postman ou les outils serveurs)
