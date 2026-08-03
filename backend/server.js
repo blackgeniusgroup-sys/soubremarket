@@ -8,15 +8,16 @@ require("dotenv").config(); // Charge les variables d'environnement depuis le fi
 const { apiLimiter } = require("./middleware/rateLimit");
 
 // Sécurité & middlewares
-app.use(helmet());
 app.use(cors({ origin: [
                      "http://localhost:5173",
                      "http://localhost:5174", 
                      process.env.CLIENT_URL
                     ].filter(Boolean),
-                      credentials: true }));
+                      credentials: true })); 
+app.use(helmet());                    
 app.use(express.json({ limit: "5mb" }));
 app.use("/api/", apiLimiter);
+
 
 // Routes
 app.use("/api/auth",     require("./routes/auth"));
