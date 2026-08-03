@@ -9,5 +9,11 @@ export default defineConfig({
       jsxRuntime: 'automatic'
     }),
     tailwindcss()
-  ]
+  ],
+  server: {
+    hmr:{
+      protocol: 'ws',
+      host: 'localhost'
+    }
+  }
 })

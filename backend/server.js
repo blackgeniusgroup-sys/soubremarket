@@ -1,9 +1,9 @@
-require("dotenv").config(); // Charge les variables d'environnement depuis le fichier .env
-const express   = require("express");
+ const express   = require("express");
 const cors      = require("cors");
 const helmet    = require("helmet");
 const app       = express();
-require("dotenv").config();
+app.set("trust proxy", 1); // Pour Heroku et autres proxys
+require("dotenv").config(); // Charge les variables d'environnement depuis le fichier .env
 
 const { apiLimiter } = require("./middleware/rateLimit");
 
@@ -12,7 +12,8 @@ app.use(helmet());
 app.use(cors({ origin: [
                      "http://localhost:5173",
                      "http://localhost:5174", 
-                     process.env.CLIENT_URL].filter(Boolean),
+                     process.env.CLIENT_URL
+                    ].filter(Boolean),
                       credentials: true }));
 app.use(express.json({ limit: "5mb" }));
 app.use("/api/", apiLimiter);
