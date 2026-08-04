@@ -27,6 +27,13 @@ app.use(helmet());
 app.use(express.json({ limit: "5mb" }));
 app.use("/api/", apiLimiter);
 
+app.use((req, res, next) => {
+  // On nettoie les doubles slashs n'importe où dans l'URL (sauf après le http:)
+  if (req.url.includes('//')) {
+    req.url = req.url.replace(/([^:]\/)\/+/g, "$1");
+  }
+  next();
+});
 
 // Routes
 app.use("/api/auth",     require("./routes/auth"));

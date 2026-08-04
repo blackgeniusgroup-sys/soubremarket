@@ -67,7 +67,7 @@ router.post("/login", authLimiter, async (req, res) => {
     const { data, error } = await supa.auth.signInWithPassword({ email, password });
     if (error) {
       console.log("DTEAIL ERREUR SUPABASE :", error);
-      return res.statuts(401).json({ error: "Email ou mot de passe incorrect" });
+      return res.status(401).json({ error: "Email ou mot de passe incorrect" });
     }
 
     // Charger le profil
