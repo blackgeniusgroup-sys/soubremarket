@@ -5,8 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 // Client Supabase PUBLIC (lecture seule, pour le Realtime)
 // Utilisez la clé ANON (publique), pas la Service Key !
 const supabasePublic = createClient(
-  process.env.REACT_APP_SUPABASE_URL,
-  process.env.REACT_APP_SUPABASE_ANON_KEY
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
 export function useOrders(params = {}) {
