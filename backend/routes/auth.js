@@ -10,7 +10,7 @@ router.post("/register", authLimiter, async (req, res) => {
   if (!email || !password || !name || !type) {
     return res.status(400).json({ error: "Champs obligatoires manquants" });
   }
-  if (!["client","vendor","livreur"].includes(type)) {
+  if (!["client","vendor","livreur", "vendeur", "admin"].includes(type)) {
     return res.status(400).json({ error: "Type invalide" });
   }
 
