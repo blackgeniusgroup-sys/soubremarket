@@ -7,24 +7,50 @@ app.set("trust proxy", 1); // Pour Heroku et autres proxys
 
 const { apiLimiter } = require("./middleware/rateLimit");
 
+// Liste blanche des origines autorisées
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "https://soubremarket.vercel.app",
+  "https://soubremarket-git-main.vercel.app",
+  "https://soubremarket-git-dev.vercel.app"
+];
+
 // Sécurité & middlewares
-// Remplacez votre app.use(cors(...)) actuel par ce bloc dynamique
 app.use(cors({
   origin: function (origin, callback) {
-    // Si la requête vient d'un navigateur (origin existe)
-    if (origin) {
-      // On autorise toutes les extensions de votre projet (localhost ou vos domaines vercel)
-      if (origin.startsWith('http://localhost') || origin.includes('vercel.app')) {
-       return callback(null, true);
-      }
+    // Autorise les requêtes sans origine (Postman, outils serveurs, webhooks)
+    if (!origin) return callback(null, true);
+    // Vérifie si l'origine est dans la liste blanche
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true);
     }
-    // Autorise aussi les requêtes sans origine (comme Postman ou les outils serveurs)
-    callback(null, true);
+    // Vérifie les sous-domaines vercel.app
+    if (origin.endsWith(".vercel.app")) {
+      return callback(null, true);
+    }
+    return callback(new Error("Origine non autorisée par CORS"));
   },
-  credentials: true
-})); 
-app.use(helmet());                    
-app.use(express.json({ limit: "5mb" }));
+  credentials: true,
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://*.supabase.co", "https://api-checkout.cinetpay.com"]
+    }
+  },
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+
+app.use(express.json({ limit: "1mb" })); // Limite la taille du corps à 1 Mo
 app.use("/api/", apiLimiter);
 
 app.use((req, res, next) => {
@@ -46,14 +72,26 @@ app.use("/api/payments", require("./routes/payments"));
 // GET /api/zones — public
 const supa = require("./services/supabase");
 app.get("/api/zones", async (req, res) => {
-  const { data } = await supa.from("zones").select("*").eq("active",true).order("max_km");
-  res.json({ zones: data });
+  try {
+    const { data, error } = await supa.from("zones").select("*").eq("active",true).order("max_km");
+    if (error) throw error;
+    res.json({ zones: data });
+  } catch (err) {
+    console.error("Erreur zones:", err);
+    res.status(500).json({ error: "Erreur lors du chargement des zones" });
+  }
 });
 
 // GET /api/map-lieux — public
 app.get("/api/map-lieux", async (req, res) => {
-  const { data } = await supa.from("map_lieux").select("*").eq("active",true).order("name");
-  res.json({ lieux: data });
+  try {
+    const { data, error } = await supa.from("map_lieux").select("*").eq("active",true).order("name");
+    if (error) throw error;
+    res.json({ lieux: data });
+  } catch (err) {
+    console.error("Erreur map-lieux:", err);
+    res.status(500).json({ error: "Erreur lors du chargement des lieux" });
+  }
 });
 
 // Health check
@@ -65,7 +103,11 @@ app.use((req, res) => res.status(404).json({ error: "Route introuvable" }));
 // Erreurs globales
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ error: "Erreur serveur interne" });
+  // Ne pas exposer les détails internes en production
+  const message = process.env.NODE_ENV === "production"
+    ? "Erreur serveur interne"
+    : err.message;
+  res.status(500).json({ error: message });
 });
 
 const PORT = process.env.PORT || 3001;

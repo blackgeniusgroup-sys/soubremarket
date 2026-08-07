@@ -27,6 +27,15 @@ const AdminDash     = lazy(() => import('./pages/admin/Dashboard'));
 const AdminLivreurs = lazy(() => import('./pages/admin/Livreurs'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 
+// Superadmin
+const SuperAdminLayout = lazy(() => import('./components/admin/SuperAdminLayout'));
+const SuperOverview     = lazy(() => import('./pages/superadmin/Overview'));
+const SuperVendeurs     = lazy(() => import('./pages/superadmin/Vendeurs'));
+const SuperProduits     = lazy(() => import('./pages/superadmin/Produits'));
+const SuperCommandes    = lazy(() => import('./pages/superadmin/Commandes'));
+const SuperFinances     = lazy(() => import('./pages/superadmin/Finances'));
+const SuperModeration   = lazy(() => import('./pages/superadmin/Moderation'));
+
 // Loader global
 function PageLoader() {
   return (
@@ -74,10 +83,31 @@ export default function App() {
           <Route path="/livreur"          element={<PrivateRoute roles={['livreur']}><Missions /></PrivateRoute>} />
           <Route path="/livreur/en-cours" element={<PrivateRoute roles={['livreur']}><EnCours /></PrivateRoute>} />
 
-          {/* Admin */}
-          <Route path="/admin"             element={<PrivateRoute roles={['admin']}><AdminDash /></PrivateRoute>} />
-          <Route path="/admin/livreurs"    element={<PrivateRoute roles={['admin']}><AdminLivreurs /></PrivateRoute>} />
-          <Route path="/admin/settings"    element={<PrivateRoute roles={['admin']}><AdminSettings /></PrivateRoute>} />
+          {/* Admin — utilise le même layout que le superadmin (Header + Sidebar) */}
+          <Route path="/admin"             element={<PrivateRoute roles={['admin','superadmin']}><SuperAdminLayout /></PrivateRoute>}>
+            <Route index element={<AdminDash />} />
+            <Route path="vendeurs" element={<AdminDash initialTab="vendors" />} />
+            <Route path="clients" element={<AdminDash initialTab="clients" />} />
+            <Route path="livreurs" element={<AdminLivreurs />} />
+            <Route path="produits" element={<AdminDash initialTab="products" />} />
+            <Route path="litiges" element={<AdminDash initialTab="orders" />} />
+            <Route path="admins" element={<AdminDash initialTab="admins" />} />
+            <Route path="settings" element={<AdminSettings />} />
+          </Route>
+
+          {/* Superadmin */}
+          <Route path="/superadmin" element={<PrivateRoute roles={['superadmin']}><SuperAdminLayout /></PrivateRoute>}>
+            <Route index element={<SuperOverview />} />
+            <Route path="vendeurs" element={<SuperVendeurs />} />
+            <Route path="clients" element={<AdminDash initialTab="clients" />} />
+            <Route path="livreurs" element={<AdminDash initialTab="livreurs" />} />
+            <Route path="admins" element={<AdminDash initialTab="admins" />} />
+            <Route path="produits" element={<SuperProduits />} />
+            <Route path="commandes" element={<SuperCommandes />} />
+            <Route path="finances" element={<SuperFinances />} />
+            <Route path="moderation" element={<SuperModeration />} />
+            <Route path="settings" element={<AdminSettings />} />
+          </Route>
 
           {/* 404 */}
           <Route path="*" element={<Navigate to="/" replace />} />

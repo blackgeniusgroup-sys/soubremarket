@@ -11,8 +11,13 @@ const STATUS = {
 
 export default function OrderRow({ order, showClient = false, showLivreur = false, onClick }) {
   const s   = STATUS[order.status] || STATUS.pending;
-  const fmt = n => Math.round(n).toLocaleString('fr-FR') + ' F';
-  const date = order.created_at ? new Date(order.created_at).toLocaleDateString('fr-FR') : order.date;
+  const fmt = n => Math.round(n || 0).toLocaleString('fr-FR') + ' F';
+  const dateStr = order.createdAt || order.created_at;
+  const date = dateStr ? new Date(dateStr).toLocaleDateString('fr-FR') : order.date;
+  const clientName = order.client?.name || order.client_name;
+  const livreurName = order.livreur?.name || order.livreur_name;
+  const zoneName = order.zone?.name || order.zone_name;
+  const orderNum = order.orderNumber || order.order_number || order.id;
 
   return (
     <div onClick={onClick} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #F1F5F4', cursor:onClick?'pointer':'default', transition:'background 0.15s' }}
@@ -21,14 +26,14 @@ export default function OrderRow({ order, showClient = false, showLivreur = fals
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
           <span style={{ fontSize:16 }}>{order.emoji || '📦'}</span>
           <span style={{ fontSize:13, fontWeight:600, color:'#0D1F1B', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-            {order.order_number || order.id}
+            {orderNum}
           </span>
         </div>
         <div style={{ fontSize:11, color:'#94A3A0' }}>
           {date}
-          {showClient && order.client_name && ` · 👤 ${order.client_name}`}
-          {showLivreur && order.livreur_name && ` · 🛵 ${order.livreur_name}`}
-          {order.zone_name && ` · 📍 ${order.zone_name}`}
+          {showClient && clientName && ` · 👤 ${clientName}`}
+          {showLivreur && livreurName && ` · 🛵 ${livreurName}`}
+          {zoneName && ` · 📍 ${zoneName}`}
         </div>
       </div>
       <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6, flexShrink:0, marginLeft:12 }}>

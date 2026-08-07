@@ -50,6 +50,10 @@ export default function Landing() {
         className="text-white/30 text-xs hover:text-white/60 transition-colors mt-2">
         ⚙️ Accès administrateur
       </button>
+      <button onClick={() => nav("/login?type=superadmin")}
+        className="text-white/20 text-xs hover:text-white/50 transition-colors mt-1">
+        👑 Accès superadmin
+      </button>
     </div>
   );
 }

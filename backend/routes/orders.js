@@ -1,7 +1,25 @@
 const express = require("express");
-const router  = express.Router();
-const supa    = require("../services/supabase");
+const router = express.Router();
+const prisma = require("../services/prisma");
 const { requireAuth, requireRole } = require("../middleware/auth");
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VALID_STATUSES = ["pending", "assigned", "picked", "delivering", "delivered", "cancelled"];
+const MAX_QTY_PER_ITEM = 100;
+const MAX_ITEMS_PER_ORDER = 50;
+const MAX_ADDR_LENGTH = 300;
+const MAX_NOTES_LENGTH = 500;
+
+function sanitizeString(value, maxLength) {
+  if (typeof value !== "string") return null;
+  return value.trim().slice(0, maxLength);
+}
+
+const generateOrderNumber = () => {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `ORD${timestamp}${random}`;
+};
 
 // POST /api/orders — passer une commande
 router.post("/", requireAuth, requireRole("client"), async (req, res) => {
@@ -11,171 +29,371 @@ router.post("/", requireAuth, requireRole("client"), async (req, res) => {
     return res.status(400).json({ error: "Données de commande incomplètes" });
   }
 
-  try {
-    // Récupérer la zone
-    const { data: zone } = await supa.from("zones").select("*").eq("id", zone_id).single();
-    if (!zone) return res.status(400).json({ error: "Zone invalide" });
+  // Validation des items
+  if (!Array.isArray(items) || items.length === 0 || items.length > MAX_ITEMS_PER_ORDER) {
+    return res.status(400).json({ error: `Entre 1 et ${MAX_ITEMS_PER_ORDER} articles par commande` });
+  }
 
-    // Récupérer les produits avec leur vendeur
-    const productIds = items.map(i => i.product_id);
-    const { data: products } = await supa
-      .from("products").select("*, vendors(id,shop_name,address)")
-      .in("id", productIds).eq("active", true);
+  const validPayMethods = ["cash", "mobile_money", "card"];
+  if (!validPayMethods.includes(pay_method)) {
+    return res.status(400).json({ error: "Méthode de paiement invalide" });
+  }
+
+  const zoneId = Number(zone_id);
+  if (!Number.isInteger(zoneId) || zoneId <= 0) {
+    return res.status(400).json({ error: "Zone invalide" });
+  }
+
+  const cleanDeliveryAddr = sanitizeString(delivery_addr, MAX_ADDR_LENGTH);
+  if (!cleanDeliveryAddr) {
+    return res.status(400).json({ error: "Adresse de livraison invalide" });
+  }
+
+  const cleanNotes = sanitizeString(notes, MAX_NOTES_LENGTH);
+
+  // Validation de chaque item
+  for (const item of items) {
+    if (!item?.product_id || !UUID_REGEX.test(item.product_id)) {
+      return res.status(400).json({ error: "ID de produit invalide" });
+    }
+    const qty = Number(item.qty);
+    if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY_PER_ITEM) {
+      return res.status(400).json({ error: `Quantité invalide (1-${MAX_QTY_PER_ITEM})` });
+    }
+  }
+
+  // Validation coordonnées GPS (si fournies)
+  let lat = null, lng = null;
+  if (delivery_lat !== undefined && delivery_lng !== undefined) {
+    lat = Number(delivery_lat);
+    lng = Number(delivery_lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+        Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      return res.status(400).json({ error: "Coordonnées GPS invalides" });
+    }
+  }
+
+  try {
+    const zone = await prisma.zone.findUnique({ where: { id: zoneId } });
+    if (!zone || zone.active === false) return res.status(400).json({ error: "Zone invalide" });
+
+    const productIds = items.map(item => item.product_id);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds }, active: true },
+      include: { vendor: true }
+    });
 
     if (products.length !== items.length) {
       return res.status(400).json({ error: "Un ou plusieurs produits sont indisponibles" });
     }
 
-    // Vérifier le stock
+    const vendorIds = [...new Set(products.map(p => p.vendorId))];
+    if (vendorIds.length !== 1) {
+      return res.status(400).json({ error: "Tous les produits doivent appartenir au même vendeur" });
+    }
+
     for (const item of items) {
-      const p = products.find(x => x.id === item.product_id);
-      if (p.stock < item.qty) {
-        return res.status(400).json({ error: `Stock insuffisant pour ${p.name}` });
+      const product = products.find(p => p.id === item.product_id);
+      if (!product) return res.status(400).json({ error: "Produit introuvable" });
+      if (product.stock < Number(item.qty)) {
+        return res.status(400).json({ error: `Stock insuffisant pour ${product.name}` });
       }
     }
 
-    // Récupérer le taux de commission
-    const { data: commSetting } = await supa
-      .from("settings").select("value").eq("key","commission_rate").single();
+    const commSetting = await prisma.setting.findUnique({ where: { key: "commission_rate" } });
     const commRate = parseFloat(commSetting?.value || "10") / 100;
+    if (!Number.isFinite(commRate) || commRate < 0 || commRate > 1) {
+      return res.status(500).json({ error: "Configuration de commission invalide" });
+    }
 
-    // Calcul des totaux
-    const subtotal     = items.reduce((s, item) => {
-      const p = products.find(x => x.id === item.product_id);
-      return s + p.price * item.qty;
+    const subtotal = items.reduce((sum, item) => {
+      const product = products.find(p => p.id === item.product_id);
+      return sum + (product?.price || 0) * Number(item.qty);
     }, 0);
-    const commission   = Math.round(subtotal * commRate);
-    const delivery_fee = zone.price;
-    const total        = subtotal + commission + delivery_fee;
-    const vendor_id    = products[0].vendors.id;
+    const commission = Math.round(subtotal * commRate);
+    const deliveryFee = zone.price;
+    const total = subtotal + commission + deliveryFee;
+    const vendor = products[0].vendor;
 
-    // Créer la commande
-    const { data: order, error: orderErr } = await supa.from("orders").insert({
-      client_id: req.user.id, vendor_id,
-      zone_id:   +zone_id, status: "pending", pay_method,
-      subtotal, commission, delivery_fee, total,
-      delivery_addr, delivery_lat, delivery_lng,
-      vendor_addr: products[0].vendors.address,
-      notes
-    }).select().single();
-    if (orderErr) throw orderErr;
+    // Vérifier que le vendeur est actif
+    if (vendor.active === false) {
+      return res.status(400).json({ error: "Le vendeur de ce produit est actuellement indisponible" });
+    }
 
-    // Créer les lignes de commande
-    const orderItems = items.map(item => {
-      const p = products.find(x => x.id === item.product_id);
-      return {
-        order_id: order.id, product_id: item.product_id,
-        name: p.name, price: p.price, emoji: p.emoji,
-        qty: item.qty, subtotal: p.price * item.qty
-      };
+    const order = await prisma.order.create({
+      data: {
+        orderNumber: generateOrderNumber(),
+        clientId: req.user.id,
+        vendorId: vendor.userId,
+        zoneId: zone.id,
+        status: "pending",
+        payMethod: pay_method,
+        subtotal,
+        commission,
+        deliveryFee,
+        total,
+        deliveryAddr: cleanDeliveryAddr,
+        deliveryLat: lat,
+        deliveryLng: lng,
+        vendorAddr: vendor.address,
+        notes: cleanNotes,
+        orderItems: {
+          create: items.map(item => {
+            const product = products.find(p => p.id === item.product_id);
+            return {
+              productId: item.product_id,
+              name: product.name,
+              price: product.price,
+              emoji: product.emoji,
+              qty: Number(item.qty),
+              subtotal: product.price * Number(item.qty)
+            };
+          })
+        }
+      },
+      include: { orderItems: true }
     });
-    await supa.from("order_items").insert(orderItems);
 
-    // Notifier le vendeur
-    const { data: vendorProfile } = await supa
-      .from("vendors").select("user_id").eq("id", vendor_id).single();
-    if (vendorProfile) {
-      await supa.from("notifications").insert({
-        user_id: vendorProfile.user_id,
-        title:   "Nouvelle commande !",
-        message: `Commande ${order.order_number} reçue — ${items.length} article(s) — ${total.toLocaleString("fr-FR")} F CFA`,
-        type:    "order",
-        data:    { order_id: order.id }
+    // Décrémenter le stock (utilisation de transactions Prisma)
+    await prisma.$transaction(
+      items.map(item => {
+        const product = products.find(p => p.id === item.product_id);
+        return prisma.product.update({
+          where: { id: product.id },
+          data: { stock: { decrement: Number(item.qty) } }
+        });
+      })
+    );
+
+    if (vendor.userId) {
+      await prisma.notification.create({
+        data: {
+          userId: vendor.userId,
+          title: "Nouvelle commande !",
+          message: `Commande ${order.orderNumber} reçue — ${items.length} article(s) — ${total.toLocaleString("fr-FR")} F CFA`,
+          type: "order",
+          data: { order_id: order.id }
+        }
       });
     }
 
     res.status(201).json({
       message: "Commande créée avec succès",
-      order:   { ...order, items: orderItems }
+      order
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Erreur création commande:", err);
+    res.status(500).json({ error: "Erreur lors de la création de la commande" });
   }
 });
 
 // GET /api/orders — mes commandes
 router.get("/", requireAuth, async (req, res) => {
   const { status, limit = 20, offset = 0 } = req.query;
+
+  // Pagination stricte
+  const pageLimit = Math.min(Math.max(parseInt(limit) || 20, 1), 50);
+  const pageOffset = Math.max(parseInt(offset) || 0, 0);
+
+  // Validation du statut
+  if (status && !VALID_STATUSES.includes(status)) {
+    return res.status(400).json({ error: "Statut invalide" });
+  }
+
   try {
-    let q = supa.from("orders_full").select("*").range(+offset, +offset + +limit - 1);
+    const where = {};
 
-    if (req.profile.type === "client")  q = q.eq("client_id", req.user.id);
-    if (req.profile.type === "livreur") {
-      const { data: liv } = await supa.from("livreurs").select("id").eq("user_id",req.user.id).single();
-      q = q.eq("livreur_id", liv?.id);
+    if (req.profile.type === "client") {
+      where.clientId = req.user.id;
     }
-    if (status) q = q.eq("status", status);
-    q = q.order("created_at", { ascending: false });
 
-    const { data, error } = await q;
-    if (error) throw error;
-    res.json({ orders: data });
+    if (req.profile.type === "livreur") {
+      // Un livreur voit les commandes disponibles (pending) OU ses propres missions en cours
+      if (status === "pending") {
+        where.status = "pending";
+        where.livreurId = { is: null };
+      } else {
+        const livreur = await prisma.livreur.findUnique({
+          where: { userId: req.user.id },
+          select: { userId: true }
+        });
+        if (!livreur) return res.json({ orders: [], total: 0 });
+        where.livreurId = livreur.userId;
+        if (status) where.status = status;
+      }
+    } else if (req.profile.type === "vendor") {
+      where.vendorId = req.user.id;
+      if (status) where.status = status;
+    } else if (req.profile.type === "admin" || req.profile.type === "superadmin") {
+      if (status) where.status = status;
+    } else {
+      return res.status(403).json({ error: "Accès interdit" });
+    }
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        skip: pageOffset,
+        take: pageLimit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          orderItems: true,
+          client: { select: { userId: true, name: true, phone: true, address: true } },
+          vendor: { select: { userId: true, shopName: true, address: true, whatsapp: true } },
+          livreur: { select: { userId: true, name: true, phone: true, status: true } },
+          zone: true
+        }
+      }),
+      prisma.order.count({ where })
+    ]);
+
+    res.json({ orders, total });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Erreur liste commandes:", err);
+    res.status(500).json({ error: "Erreur lors du chargement des commandes" });
   }
 });
 
 // GET /api/orders/:id
 router.get("/:id", requireAuth, async (req, res) => {
+  const orderId = req.params.id;
+  if (!UUID_REGEX.test(orderId || "")) {
+    return res.status(400).json({ error: "ID de commande invalide" });
+  }
+
   try {
-    const { data, error } = await supa
-      .from("orders_full").select("*").eq("id", req.params.id).single();
-    if (error) return res.status(404).json({ error: "Commande introuvable" });
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        orderItems: true,
+        client: { select: { userId: true, name: true, phone: true, address: true } },
+        vendor: { select: { userId: true, shopName: true, address: true, whatsapp: true } },
+        livreur: { select: { userId: true, name: true, phone: true, status: true } },
+        zone: true
+      }
+    });
 
-    // Charger les items
-    const { data: items } = await supa
-      .from("order_items").select("*").eq("order_id", req.params.id);
+    if (!order) return res.status(404).json({ error: "Commande introuvable" });
 
-    res.json({ ...data, items });
+    // Vérification d'autorisation — IDOR
+    const isClient = req.profile.type === "client" && order.clientId === req.user.id;
+    const isVendor = req.profile.type === "vendor" && order.vendorId === req.user.id;
+    const isLivreur = req.profile.type === "livreur" && order.livreurId === req.user.id;
+    const isAdmin = req.profile.type === "admin" || req.profile.type === "superadmin";
+
+    if (!isClient && !isVendor && !isLivreur && !isAdmin) {
+      return res.status(403).json({ error: "Accès non autorisé à cette commande" });
+    }
+
+    res.json(order);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Erreur affichage commande:", err);
+    res.status(500).json({ error: "Erreur lors du chargement de la commande" });
   }
 });
 
 // PATCH /api/orders/:id/status — livreur met à jour le statut
 router.patch("/:id/status", requireAuth, requireRole("livreur","admin"), async (req, res) => {
+  const orderId = req.params.id;
+  if (!UUID_REGEX.test(orderId || "")) {
+    return res.status(400).json({ error: "ID de commande invalide" });
+  }
+
   const { status } = req.body;
   const validStatuses = ["assigned","picked","delivering","delivered","cancelled"];
   if (!validStatuses.includes(status)) {
     return res.status(400).json({ error: "Statut invalide" });
   }
+
   try {
-    const { data, error } = await supa
-      .from("orders").update({ status }).eq("id", req.params.id).select().single();
-    if (error) throw error;
-    // Le trigger SQL envoie automatiquement la notification au client
-    res.json({ message: "Statut mis à jour", order: data });
+    // Charger la commande AVANT pour vérifier les autorisations
+    const existing = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, livreurId: true, status: true, clientId: true, orderNumber: true }
+    });
+
+    if (!existing) return res.status(404).json({ error: "Commande introuvable" });
+
+    // Un livreur ne peut modifier QUE ses propres missions
+    if (req.profile.type === "livreur") {
+      if (existing.livreurId !== req.user.id) {
+        return res.status(403).json({ error: "Vous ne pouvez pas modifier cette commande" });
+      }
+      if (existing.status === "delivered" || existing.status === "cancelled") {
+        return res.status(400).json({ error: "Cette commande est déjà terminée" });
+      }
+    }
+
+    // Si un livreur accepte une mission (status=assigned), on l'assigne automatiquement
+    const data = { status };
+    if (req.profile.type === "livreur" && status === "assigned") {
+      data.livreurId = req.user.id;
+    }
+
+    const order = await prisma.order.update({
+      where: { id: orderId },
+      data,
+      include: { client: { select: { userId: true } } }
+    });
+
+    // Notifier le client
+    await prisma.notification.create({
+      data: {
+        userId: order.client.userId,
+        title: "Mise à jour de votre commande",
+        message: `Votre commande ${order.orderNumber} est maintenant : ${status}`,
+        type: "order",
+        data: { order_id: order.id, status }
+      }
+    });
+
+    res.json({ message: "Statut mis à jour", order });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Erreur mise à jour statut:", err);
+    res.status(500).json({ error: "Erreur lors de la mise à jour du statut" });
   }
 });
 
 // PATCH /api/orders/:id/assign — admin assigne un livreur
 router.patch("/:id/assign", requireAuth, requireRole("admin"), async (req, res) => {
+  const orderId = req.params.id;
+  if (!UUID_REGEX.test(orderId || "")) {
+    return res.status(400).json({ error: "ID de commande invalide" });
+  }
+
   const { livreur_id } = req.body;
-  if (!livreur_id) return res.status(400).json({ error: "livreur_id requis" });
+  if (!livreur_id || !UUID_REGEX.test(livreur_id)) {
+    return res.status(400).json({ error: "livreur_id valide requis" });
+  }
   try {
-    const { data: livreur } = await supa
-      .from("livreurs").select("id,user_id").eq("id",livreur_id).eq("status","approved").single();
-    if (!livreur) return res.status(400).json({ error: "Livreur invalide ou non approuvé" });
+    const livreur = await prisma.livreur.findUnique({
+      where: { userId: livreur_id },
+      select: { userId: true, name: true, status: true }
+    });
+    if (!livreur || livreur.status !== "approved") {
+      return res.status(400).json({ error: "Livreur invalide ou non approuvé" });
+    }
 
-    const { data, error } = await supa.from("orders")
-      .update({ livreur_id, status: "assigned" })
-      .eq("id", req.params.id).select().single();
-    if (error) throw error;
-
-    // Notifier le livreur
-    await supa.from("notifications").insert({
-      user_id: livreur.user_id,
-      title:   "Nouvelle mission !",
-      message: `Vous avez une nouvelle livraison assignée — ${data.order_number}`,
-      type:    "delivery",
-      data:    { order_id: data.id }
+    const order = await prisma.order.update({
+      where: { id: orderId },
+      data: { livreurId: livreur.userId, status: "assigned" }
     });
 
-    res.json({ message: "Livreur assigné", order: data });
+    // Notifier le livreur
+    await prisma.notification.create({
+      data: {
+        userId: livreur.userId,
+        title: "Nouvelle mission !",
+        message: `Vous avez une nouvelle livraison assignée — ${order.orderNumber}`,
+        type: "delivery",
+        data: { order_id: order.id }
+      }
+    });
+
+    res.json({ message: "Livreur assigné", order });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("Erreur assignation:", err);
+    res.status(500).json({ error: "Erreur lors de l'assignation du livreur" });
   }
 });
 

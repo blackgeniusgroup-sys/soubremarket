@@ -7,6 +7,7 @@ const ROUTES = {
   vendor:  [['📊','Tableau de bord','/vendor'],['➕','Publier','/vendor/publier']],
   livreur: [['📦','Missions','/livreur'],['🛵','En cours','/livreur/en-cours']],
   admin:   [['📊','Dashboard','/admin'],['🛵','Livreurs','/admin/livreurs'],['⚙️','Paramètres','/admin/settings']],
+  superadmin: [['📊','Dashboard','/admin'],['🛵','Livreurs','/admin/livreurs'],['⚙️','Paramètres','/admin/settings']],
 };
 
 export default function Navbar({ cartCount = 0, unread = 0, onNotif }) {
@@ -19,7 +20,7 @@ export default function Navbar({ cartCount = 0, unread = 0, onNotif }) {
 
   const handleLogout = async () => { await logout(); navigate('/'); };
 
-  const roleColor = { client:'#1D9E75', vendor:'#2478D4', livreur:'#EF9F27', admin:'#7B52B5' };
+  const roleColor = { client:'#1D9E75', vendor:'#2478D4', livreur:'#EF9F27', admin:'#7B52B5', superadmin:'#6D28D9' };
 
   return (
     <>

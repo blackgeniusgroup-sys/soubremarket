@@ -101,7 +101,7 @@ export default function Catalogue() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            {products.map(p => <ProductCard key={p.id} product={p} onAdd={() => handleAdd(p)} onClick={() => nav(`/client/produit/${p.id}`)} />)}
+            {products.map(p => <ProductCard key={p.id} product={p} onAdd={() => handleAdd(p)} onClick={() => nav(`/produit/${p.id}`)} />)}
           </div>
         )}
       </div>

@@ -8,6 +8,7 @@ const ROLES = {
   vendor:  { ico:"🏪", label:"Commerçant",  color:"from-blue-600 to-blue-800" },
   livreur: { ico:"🛵", label:"Livreur",     color:"from-orange-500 to-orange-700" },
   admin:   { ico:"🔐", label:"Admin",       color:"from-slate-700 to-slate-900" },
+  superadmin: { ico:"👑", label:"Superadmin", color:"from-purple-700 to-purple-900" },
 };
 
 export default function Login() {
@@ -26,8 +27,8 @@ export default function Login() {
     setLoading(true); setError(null);
     try {
       const profile = await login(email, password);
-      const routes = { client:"/client", vendor:"/vendor", livreur:"/livreur", admin:"/admin" };
-      nav(routes[profile.type] || "/client");
+      const routes = { client:"/accueil", vendor:"/vendor", livreur:"/livreur", admin:"/admin", superadmin:"/superadmin" };
+      nav(routes[profile.type] || "/accueil");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -37,7 +38,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <div className={`bg-gradient-to-br ${role.color} py-10 text-center`}>
+      <div className={`bg-linear-to-br ${role.color} py-10 text-center`}>
         <div className="text-4xl mb-2">{role.ico}</div>
         <h2 className="text-white text-xl font-semibold">Espace {role.label}</h2>
         <p className="text-white/60 text-sm mt-1">SoubreMarket</p>
@@ -66,25 +67,15 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-4 text-center">
-            <Link to={`/register?type=${type}`} className="text-emerald-600 text-sm hover:underline">
-              Pas encore de compte ? S'inscrire
-            </Link>
-          </div>
+          {type !== "admin" && type !== "superadmin" && (
+            <div className="mt-4 text-center">
+              <Link to={`/register?type=${type}`} className="text-emerald-600 text-sm hover:underline">
+                Pas encore de compte ? S'inscrire
+              </Link>
+            </div>
+          )}
           <div className="mt-2 text-center">
             <Link to="/" className="text-gray-400 text-xs hover:text-gray-600">← Retour à l'accueil</Link>
-          </div>
-
-          <div className="mt-5 pt-4 border-t border-gray-100 text-center">
-            <p className="text-xs text-gray-400 mb-2">Accès démo rapide</p>
-            <div className="flex gap-2">
-              {["client","vendor","livreur","admin"].map(r=>(
-                <button key={r} onClick={()=>{ setEmail(r+"@demo.com"); setPass("demo1234"); }}
-                  className="flex-1 border border-gray-200 rounded-lg py-1 text-xs text-gray-500 hover:bg-gray-50 capitalize">
-                  {r}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </div>

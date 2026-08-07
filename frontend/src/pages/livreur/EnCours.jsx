@@ -43,7 +43,7 @@ export default function EnCours() {
         return (
           <div key={o.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
             <div className="flex justify-between items-start mb-3">
-              <h3 className="font-bold text-gray-800">{o.order_number}</h3>
+              <h3 className="font-bold text-gray-800">{o.orderNumber}</h3>
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-semibold">{STEP_LABEL[o.status]}</span>
             </div>
 
@@ -67,7 +67,7 @@ export default function EnCours() {
             {/* Infos client */}
             <div className="bg-gray-50 rounded-xl p-3 mb-3 text-sm">
               <div className="grid grid-cols-2 gap-1">
-                {[["Client",o.client_name],["Tél",o.client_phone],["Adresse",o.delivery_addr],["Paiement",o.pay_method==="cash"?"💵 Cash":"📱 Wave"]].map(([k,v])=>(
+                {[["Client",o.client?.name],["Tél",o.client?.phone],["Adresse",o.deliveryAddr],["Paiement",o.payMethod==="cash"?"💵 Cash":"📱 Wave"]].map(([k,v])=>(
                   <div key={k} className={k==="Adresse"?"col-span-2":""}>
                     <span className="text-gray-400 text-xs">{k} : </span>
                     <span className="font-medium text-gray-800">{v||"—"}</span>
@@ -84,9 +84,9 @@ export default function EnCours() {
                   {action.label}
                 </button>
               )}
-              <a href={`https://wa.me/${o.client_phone}`} target="_blank" rel="noreferrer"
+              <a href={`https://wa.me/${o.client?.phone}`} target="_blank" rel="noreferrer"
                 className="bg-green-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold">💬</a>
-              <a href={`tel:${o.client_phone}`}
+              <a href={`tel:${o.client?.phone}`}
                 className="bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-semibold">📞</a>
             </div>
           </div>

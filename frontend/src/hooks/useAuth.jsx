@@ -14,7 +14,7 @@ export function AuthProvider({ children }) {
     if (token) {
       Auth.me()
         .then(({ user, profile }) => { setUser(user); setProfile(profile); })
-        .catch(() => api.removeToken())
+        .catch(() => api.removeTokens())
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -28,7 +28,7 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     const data = await Auth.login({ email, password });
-    api.setToken(data.access_token);
+    api.setTokens(data.access_token, data.refresh_token);
     setUser(data.user);
     setProfile(data.user.profile);
     return data.user.profile;
@@ -40,7 +40,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     await Auth.logout().catch(() => {});
-    api.removeToken();
+    api.removeTokens();
     setUser(null);
     setProfile(null);
   }, []);

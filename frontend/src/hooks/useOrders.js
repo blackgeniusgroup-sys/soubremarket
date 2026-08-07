@@ -60,24 +60,27 @@ export function useOrderTracking(orderId) {
 
   // Abonnement Realtime : position GPS du livreur
   useEffect(() => {
-    if (!order?.livreur_id) return;
+    const livreurId = order?.livreurId || order?.livreur_id;
+    if (!livreurId) return;
 
     const livreurSub = supabasePublic
-      .channel(`livreur:${order.livreur_id}`)
+      .channel(`livreur:${livreurId}`)
       .on("postgres_changes", {
         event:  "UPDATE",
         schema: "public",
         table:  "livreurs",
-        filter: `id=eq.${order.livreur_id}`,
+        filter: `user_id=eq.${livreurId}`,
       }, (payload) => {
-        if (payload.new.current_lat && payload.new.current_lng) {
-          setLivreurPos({ lat: payload.new.current_lat, lng: payload.new.current_lng });
+        const lat = payload.new.current_lat ?? payload.new.currentLat;
+        const lng = payload.new.current_lng ?? payload.new.currentLng;
+        if (lat !== null && lat !== undefined && lng !== null && lng !== undefined) {
+          setLivreurPos({ lat: Number(lat), lng: Number(lng) });
         }
       })
       .subscribe();
 
     return () => { supabasePublic.removeChannel(livreurSub); };
-  }, [order?.livreur_id]);
+  }, [order?.livreurId || order?.livreur_id]);
 
   return { order, livreurPos };
 }

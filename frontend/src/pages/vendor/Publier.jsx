@@ -4,23 +4,39 @@ import { Products } from "../../api/client";
 import Toast from "../../components/Toast";
 
 const CATS = ["Alimentation","Agriculture","Artisanat","Beauté","Électronique","Vêtements"];
-const EMOJIS = { Alimentation:"🥘", Agriculture:"🌿", Artisanat:"🎨", Beauté:"✨", Électronique:"📱", Vêtements:"👕" };
+const EMOJIS = ["📦","🍎","🥕","🌾","🧴","📱","👕","🛒","🍞","🐟","🐔","🥤"];
 
 export default function Publier() {
   const nav = useNavigate();
-  const [form, setForm] = useState({ name:"", description:"", price:"", stock:"", category:"Alimentation", featured:false });
+  const [form, setForm] = useState({
+    name: "", description: "", price: "", stock: "",
+    category: "Alimentation", emoji: "📦", featured: false
+  });
   const [loading, setLoading] = useState(false);
-  const [toast, setToast]     = useState(null);
+  const [toast, setToast] = useState(null);
 
-  const handleSubmit = async (e) => {
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handle = async (e) => {
     e.preventDefault();
+    if (!form.name || !form.price || !form.stock) {
+      return setToast({ message: "Nom, prix et stock sont obligatoires", type: "error" });
+    }
     setLoading(true);
     try {
-      await Products.create({ ...form, price:+form.price, stock:+form.stock, emoji:EMOJIS[form.category] });
-      setToast({ message:"Article publié avec succès ! ✓", type:"success" });
+      await Products.create({
+        name: form.name,
+        description: form.description,
+        price: Number(form.price),
+        stock: Number(form.stock),
+        category: form.category,
+        emoji: form.emoji,
+        featured: form.featured
+      });
+      setToast({ message: "Produit publié avec succès ! ✅", type: "success" });
       setTimeout(() => nav("/vendor"), 1500);
     } catch (err) {
-      setToast({ message:err.message, type:"error" });
+      setToast({ message: err.message, type: "error" });
     } finally {
       setLoading(false);
     }
@@ -28,61 +44,70 @@ export default function Publier() {
 
   return (
     <div className="pb-24 px-4 py-4">
-      {toast && <Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)} />}
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={()=>nav(-1)} className="text-gray-400 hover:text-gray-600">←</button>
-        <h1 className="text-lg font-bold text-gray-800">Publier un article</h1>
-      </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <h1 className="text-xl font-bold text-gray-800 mb-5">➕ Publier un produit</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handle} className="space-y-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Nom du produit *</label>
-            <input required type="text" placeholder="Ex: Riz local 5kg" value={form.name}
-              onChange={e=>setForm(f=>({...f,name:e.target.value}))}
+            <input type="text" required value={form.name} onChange={e => set("name", e.target.value)}
+              placeholder="Ex: Tomates fraîches"
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
           </div>
+
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Description</label>
+            <textarea value={form.description} onChange={e => set("description", e.target.value)} rows={3}
+              placeholder="Décrivez votre produit..."
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none" />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Prix (F CFA) *</label>
-              <input required type="number" min="1" placeholder="3500" value={form.price}
-                onChange={e=>setForm(f=>({...f,price:e.target.value}))}
+              <input type="number" required value={form.price} onChange={e => set("price", e.target.value)}
+                placeholder="0"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Stock *</label>
-              <input required type="number" min="0" placeholder="20" value={form.stock}
-                onChange={e=>setForm(f=>({...f,stock:e.target.value}))}
+              <input type="number" required value={form.stock} onChange={e => set("stock", e.target.value)}
+                placeholder="0"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
             </div>
           </div>
+
           <div>
             <label className="block text-xs text-gray-500 mb-1">Catégorie</label>
-            <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}
+            <select value={form.category} onChange={e => set("category", e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
-              {CATS.map(c=><option key={c}>{c}</option>)}
+              {CATS.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Description</label>
-            <textarea rows={3} placeholder="Décrivez votre produit..." value={form.description}
-              onChange={e=>setForm(f=>({...f,description:e.target.value}))}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none" />
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={form.featured} onChange={e=>setForm(f=>({...f,featured:e.target.checked}))}
-              className="w-4 h-4 accent-emerald-600" />
-            <span className="text-sm text-gray-700">⭐ Mettre ce produit à la Une</span>
-          </label>
-        </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
-          💡 Une commission de <strong>10%</strong> sera automatiquement prélevée sur chaque vente pour l'entretien de la plateforme.
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Icône</label>
+            <div className="flex gap-2 flex-wrap">
+              {EMOJIS.map(em => (
+                <button type="button" key={em} onClick={() => set("emoji", em)}
+                  className={`w-10 h-10 rounded-lg text-xl border-2 ${form.emoji === em ? "border-emerald-500 bg-emerald-50" : "border-gray-200"}`}>
+                  {em}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={form.featured} onChange={e => set("featured", e.target.checked)}
+              className="w-4 h-4 rounded accent-emerald-600" />
+            <span className="text-sm text-gray-600">⭐ Produit en vedette</span>
+          </label>
         </div>
 
         <button type="submit" disabled={loading}
           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-2xl text-base transition-all disabled:opacity-60 shadow-lg shadow-emerald-200">
-          {loading ? "Publication en cours..." : "🚀 Publier l'article"}
+          {loading ? "Publication..." : "✅ Publier le produit"}
         </button>
       </form>
     </div>

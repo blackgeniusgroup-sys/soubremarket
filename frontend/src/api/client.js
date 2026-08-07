@@ -3,18 +3,28 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 class ApiClient {
   constructor() {
     this.baseUrl = API_URL;
+    this.tokenKey = "soubremarket_token";
+    this.refreshKey = "soubremarket_refresh_token";
   }
 
   getToken() {
-    return localStorage.getItem("soubremarket_token");
+    return localStorage.getItem(this.tokenKey);
   }
 
-  setToken(token) {
-    localStorage.setItem("soubremarket_token", token);
+  getRefreshToken() {
+    return localStorage.getItem(this.refreshKey);
   }
 
-  removeToken() {
-    localStorage.removeItem("soubremarket_token");
+  setTokens(accessToken, refreshToken) {
+    localStorage.setItem(this.tokenKey, accessToken);
+    if (refreshToken) {
+      localStorage.setItem(this.refreshKey, refreshToken);
+    }
+  }
+
+  removeTokens() {
+    localStorage.removeItem(this.tokenKey);
+    localStorage.removeItem(this.refreshKey);
   }
 
   async request(endpoint, options = {}) {
@@ -30,15 +40,22 @@ class ApiClient {
 
     try {
       const res = await fetch(`${this.baseUrl}${endpoint}`, config);
-      const data = await res.json();
+
+      // Gérer les réponses vides (204, etc.)
+      if (res.status === 204) {
+        return null;
+      }
+
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json") ? await res.json() : await res.text();
 
       if (!res.ok) {
         // Token expiré → déconnexion automatique
         if (res.status === 401) {
-          this.removeToken();
+          this.removeTokens();
           window.dispatchEvent(new Event("auth:logout"));
         }
-        throw new Error(data.error || `Erreur ${res.status}`);
+        throw new Error(typeof data === "string" ? data : (data.error || `Erreur ${res.status}`));
       }
 
       return data;
@@ -54,6 +71,12 @@ class ApiClient {
   post(url, body)       { return this.request(url, { method: "POST",   body: JSON.stringify(body) }); }
   patch(url, body)      { return this.request(url, { method: "PATCH",  body: JSON.stringify(body) }); }
   delete(url)           { return this.request(url, { method: "DELETE" }); }
+
+  // Nettoyage sécurisé des données
+  sanitizeInput(value) {
+    if (typeof value !== "string") return value;
+    return value.replace(/[<>]/g, "").slice(0, 5000);
+  }
 }
 
 export const api = new ApiClient();
@@ -104,8 +127,37 @@ export const Admin = {
   addLieu:       (data)      => api.post("/admin/map-lieux", data),
   updateLieu:    (id, data)  => api.patch(`/admin/map-lieux/${id}`, data),
   deleteLieu:    (id)        => api.delete(`/admin/map-lieux/${id}`),
+  // Zones de livraison
+  zones:         ()          => api.get("/admin/zones"),
+  addZone:       (data)      => api.post("/admin/zones", data),
+  updateZone:    (id, data)  => api.patch(`/admin/zones/${id}`, data),
+  deleteZone:    (id)        => api.delete(`/admin/zones/${id}`),
+  // Catégories de produits
+  categories:    ()          => api.get("/admin/categories"),
+  addCategory:   (data)      => api.post("/admin/categories", data),
+  deleteCategory:(id)        => api.delete(`/admin/categories/${id}`),
+  // Admins
+  admins:        ()          => api.get("/admin/admins"),
+  addAdmin:      (data)      => api.post("/admin/admins", data),
+  updateAdmin:   (id, data)  => api.patch(`/admin/admins/${id}`, data),
+  deleteAdmin:   (id)        => api.delete(`/admin/admins/${id}`),
+  // Thèmes
+  themes:        ()          => api.get("/admin/themes"),
+  saveTheme:     (theme)     => api.patch("/admin/themes", { theme }),
 };
 
 export const Payments = {
   initiate: (order_id) => api.post("/payments/initiate", { order_id }),
 };
+
+export const Zones = {
+  list: () => api.get("/zones"),
+};
+
+// Utilitaire : échapper le HTML pour éviter XSS dans l'affichage
+export function escapeHtml(str) {
+  if (typeof str !== "string") return str;
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}

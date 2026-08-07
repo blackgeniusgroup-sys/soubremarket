@@ -31,7 +31,7 @@ export default function Suivi() {
             {orders.map(o=>(
               <button key={o.id} onClick={()=>setSelectedId(o.id)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${selectedId===o.id?"bg-emerald-600 text-white border-emerald-600":"border-gray-200 text-gray-600"}`}>
-                {o.order_number}
+                {o.orderNumber}
               </button>
             ))}
           </div>
@@ -43,7 +43,7 @@ export default function Suivi() {
           {/* Barre de progression */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-gray-700">{order.order_number}</span>
+              <span className="text-sm font-semibold text-gray-700">{order.orderNumber}</span>
               <span className={`text-xs font-semibold px-2 py-1 rounded-full ${order.status==="delivered"?"bg-green-100 text-green-700":"bg-amber-100 text-amber-700"}`}>
                 {order.status==="delivered"?"Livré ✓":"En cours"}
               </span>
@@ -83,10 +83,10 @@ export default function Suivi() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Détails de la commande</h3>
             {[
-              ["Produit", order.items?.map(i=>i.name).join(", ") || "—"],
-              ["Adresse", order.delivery_addr || "—"],
-              ["Livreur", order.livreur_name || "En attente d'assignation"],
-              ["Paiement", order.pay_method==="cash"?"💵 Cash":"📱 Wave / OM"],
+              ["Produit", order.orderItems?.map(i=>i.name).join(", ") || "—"],
+              ["Adresse", order.deliveryAddr || "—"],
+              ["Livreur", order.livreur?.name || "En attente d'assignation"],
+              ["Paiement", order.payMethod==="cash"?"💵 Cash":"📱 Wave / OM"],
               ["Total", (order.total||0).toLocaleString("fr-FR")+" F"],
             ].map(([k,v])=>(
               <div key={k} className="flex justify-between py-1.5 text-sm border-b border-gray-50 last:border-0">

@@ -1,27 +1,55 @@
-const jwt    = require("jsonwebtoken");
 const supa   = require("../services/supabase");
+const prisma = require("../services/prisma");
+
+async function loadProfile(userId) {
+  const [superAdmin, admin, client, vendor, livreur] = await Promise.all([
+    prisma.superadmins.findUnique({ where: { user_id: userId } }),
+    prisma.admins.findUnique({ where: { user_id: userId } }),
+    prisma.client.findUnique({ where: { userId } }),
+    prisma.vendor.findUnique({ where: { userId } }),
+    prisma.livreur.findUnique({ where: { userId } })
+  ]);
+
+  if (superAdmin) return { ...superAdmin, type: "superadmin" };
+  if (admin) return { ...admin, type: "admin" };
+  if (client) return { ...client, type: "client" };
+  if (vendor) return { ...vendor, type: "vendor" };
+  if (livreur) return { ...livreur, type: "livreur" };
+  return null;
+}
 
 // Vérifie le JWT Supabase et charge le profil utilisateur
 async function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.replace("Bearer ", "");
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Token manquant ou format invalide" });
+  }
+
+  const token = authHeader.slice(7).trim();
   if (!token) return res.status(401).json({ error: "Token manquant" });
 
   try {
-    // Vérification via Supabase Auth
     const { data: { user }, error } = await supa.auth.getUser(token);
-    if (error || !user) return res.status(401).json({ error: "Token invalide" });
+    if (error || !user) return res.status(401).json({ error: "Token invalide ou expiré" });
 
-    // Charger le profil depuis la DB
-    const { data: profile } = await supa
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
+    const profile = await loadProfile(user.id);
+    if (!profile) return res.status(403).json({ error: "Profil introuvable" });
 
-    req.user   = user;
+    // Vérifier que le compte est actif
+    if (profile.active === false) {
+      return res.status(403).json({ error: "Compte désactivé. Contactez l'administrateur." });
+    }
+
+    // Pour les livreurs, vérifier le statut
+    if (profile.type === "livreur" && profile.status === "suspended") {
+      return res.status(403).json({ error: "Compte livreur suspendu. Contactez l'administrateur." });
+    }
+
+    req.user = user;
     req.profile = profile;
     next();
-  } catch {
+  } catch (err) {
+    console.error("Erreur authentification:", err);
     return res.status(401).json({ error: "Authentification échouée" });
   }
 }

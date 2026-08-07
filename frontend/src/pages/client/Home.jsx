@@ -18,7 +18,7 @@ export default function ClientHome() {
         <h1 className="text-white text-2xl font-bold mt-1 mb-1">Bienvenue sur<br/>SoubreMarket</h1>
         <p className="text-emerald-200 text-xs italic mb-4">« Achetez sans quitter le confort de votre maison. »</p>
         <div className="relative">
-          <input placeholder="🔍 Rechercher un produit..." onClick={() => nav("/client/catalogue")}
+          <input placeholder="🔍 Rechercher un produit..." onClick={() => nav("/catalogue")}
             className="w-full bg-white rounded-xl px-4 py-3 text-sm shadow-sm outline-none cursor-pointer" readOnly />
         </div>
       </div>
@@ -40,7 +40,7 @@ export default function ClientHome() {
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Catégories</h2>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {[["🌾","Alimentation"],["🌿","Agriculture"],["🎨","Artisanat"],["✨","Beauté"],["📱","Électronique"],["👕","Vêtements"]].map(([e,l])=>(
-              <button key={l} onClick={() => nav(`/client/catalogue?cat=${l}`)}
+              <button key={l} onClick={() => nav(`/catalogue?cat=${l}`)}
                 className="flex-shrink-0 flex flex-col items-center bg-white rounded-xl border border-gray-100 shadow-sm px-3 py-2 gap-1 hover:border-emerald-300 transition-colors">
                 <span className="text-xl">{e}</span>
                 <span className="text-xs text-gray-600 whitespace-nowrap">{l}</span>
@@ -54,12 +54,12 @@ export default function ClientHome() {
           <div className="mb-5">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-sm font-semibold text-gray-700">⭐ À la Une</h2>
-              <button onClick={() => nav("/client/catalogue?featured=true")} className="text-emerald-600 text-xs">Voir tout</button>
+              <button onClick={() => nav("/catalogue?featured=true")} className="text-emerald-600 text-xs">Voir tout</button>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
               {featured.map(p => (
                 <div key={p.id} className="flex-shrink-0 w-36">
-                  <ProductCard product={p} compact onClick={() => nav(`/client/catalogue?product=${p.id}`)} />
+                  <ProductCard product={p} compact onClick={() => nav(`/catalogue?product=${p.id}`)} />
                 </div>
               ))}
             </div>
@@ -70,10 +70,10 @@ export default function ClientHome() {
         <div className="mb-4">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-sm font-semibold text-gray-700">🆕 Nouveautés</h2>
-            <button onClick={() => nav("/client/catalogue")} className="text-emerald-600 text-xs">Voir tout →</button>
+            <button onClick={() => nav("/catalogue")} className="text-emerald-600 text-xs">Voir tout →</button>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            {recent.map(p => <ProductCard key={p.id} product={p} onClick={() => nav(`/client/catalogue?product=${p.id}`)} />)}
+            {recent.map(p => <ProductCard key={p.id} product={p} onClick={() => nav(`/catalogue?product=${p.id}`)} />)}
           </div>
         </div>
       </div>

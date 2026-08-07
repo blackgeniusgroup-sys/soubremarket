@@ -34,8 +34,8 @@ export default function Missions() {
         <div key={o.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
           <div className="flex justify-between items-start mb-3">
             <div>
-              <h3 className="font-bold text-gray-800">{o.order_number}</h3>
-              <p className="text-xs text-gray-400">{o.created_at?.split("T")[0]} · {o.pay_method==="cash"?"💵 Cash":"📱 Wave"}</p>
+              <h3 className="font-bold text-gray-800">{o.orderNumber}</h3>
+              <p className="text-xs text-gray-400">{o.createdAt?.split("T")[0]} · {o.payMethod==="cash"?"💵 Cash":"📱 Wave"}</p>
             </div>
             <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg">+{Math.round(o.total*0.1).toLocaleString("fr-FR")} F</span>
           </div>
@@ -43,19 +43,19 @@ export default function Missions() {
           {/* Article */}
           <div className="bg-emerald-50 rounded-xl p-3 mb-3">
             <p className="text-xs font-semibold text-emerald-700 mb-1">📦 Article à livrer</p>
-            <p className="text-sm font-medium text-gray-800">{o.items?.map(i=>i.name).join(", ")} · {o.total.toLocaleString("fr-FR")} F</p>
+            <p className="text-sm font-medium text-gray-800">{o.orderItems?.map(i=>i.name).join(", ")} · {o.total.toLocaleString("fr-FR")} F</p>
           </div>
 
           {/* Trajet */}
           <div className="bg-gray-50 rounded-xl p-3 mb-3 space-y-2">
             <div className="flex gap-2">
               <div className="w-6 h-6 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center font-bold flex-shrink-0">A</div>
-              <div><p className="text-xs font-semibold text-emerald-700">Récupérer chez</p><p className="text-sm font-medium">{o.vendor_name}</p><p className="text-xs text-gray-500">📍 {o.vendor_address}</p></div>
+              <div><p className="text-xs font-semibold text-emerald-700">Récupérer chez</p><p className="text-sm font-medium">{o.vendor?.shopName}</p><p className="text-xs text-gray-500">📍 {o.vendorAddr || o.vendor?.address}</p></div>
             </div>
             <div className="border-l-2 border-dashed border-emerald-300 h-3 ml-3" />
             <div className="flex gap-2">
               <div className="w-6 h-6 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold flex-shrink-0">B</div>
-              <div><p className="text-xs font-semibold text-red-600">Livrer à</p><p className="text-sm font-medium">{o.client_name}</p><p className="text-xs text-gray-500">📍 {o.delivery_addr}</p><p className="text-xs text-gray-500">📞 {o.client_phone}</p></div>
+              <div><p className="text-xs font-semibold text-red-600">Livrer à</p><p className="text-sm font-medium">{o.client?.name}</p><p className="text-xs text-gray-500">📍 {o.deliveryAddr}</p><p className="text-xs text-gray-500">📞 {o.client?.phone}</p></div>
             </div>
           </div>
 
@@ -64,7 +64,7 @@ export default function Missions() {
               className="flex-1 bg-emerald-600 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-emerald-700 transition-colors">
               ✋ Accepter la mission
             </button>
-            <a href={`https://wa.me/${o.client_phone}?text=Bonjour ${o.client_name}, je suis votre livreur SoubreMarket pour la commande ${o.order_number}`}
+            <a href={`https://wa.me/${o.client?.phone}?text=Bonjour ${o.client?.name}, je suis votre livreur SoubreMarket pour la commande ${o.orderNumber}`}
               target="_blank" rel="noreferrer"
               className="bg-green-500 text-white px-3 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-1 hover:bg-green-600">
               💬
