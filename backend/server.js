@@ -68,6 +68,7 @@ app.use("/api/orders",   require("./routes/orders"));
 app.use("/api/livreurs", require("./routes/livreurs"));
 app.use("/api/admin",    require("./routes/admin"));
 app.use("/api/payments", require("./routes/payments"));
+app.use("/api/vendor",   require("./routes/vendor"));
 
 // GET /api/zones — public
 const supa = require("./services/supabase");

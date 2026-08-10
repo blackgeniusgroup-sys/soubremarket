@@ -5,7 +5,7 @@ import { useCart } from "../../hooks/useCart";
 import ProductCard from "../../components/ProductCard";
 import Toast from "../../components/Toast";
 
-const CATS = ["Tous","Alimentation","Agriculture","Artisanat","Beauté","Électronique","Vêtements"];
+const CATS = ["Tous","alimentation","vetements","electronique","maison","beaute","autres"];
 
 export default function Catalogue() {
   const [params] = useSearchParams();

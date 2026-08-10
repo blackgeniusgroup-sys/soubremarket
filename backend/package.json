@@ -122,7 +122,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "dev": "nodemon server.js"
   },
   "devDependencies": {
     "prisma": "^5.0.0"

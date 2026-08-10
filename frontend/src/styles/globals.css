@@ -2,29 +2,13 @@
 @import "tailwindcss";
 
 :root {
-  --color-primary: #0F6E56;
-  --color-accent: #1D9E75;
-  --color-light: #E1F5EE;
-  --color-danger: #D85A30;
-  --color-warning: #EF9F27;
-  --color-success: #27500A;
-  
-  --color-gray-50: #F8FAFC;
-  --color-gray-100: #F1F5F9;
-  --color-gray-200: #E2E8F0;
-  --color-gray-400: #94A3B8;
-  --color-gray-600: #475569;
-  --color-gray-900: #0F172A;
-
-  --radius-sm: 6px;
-  --radius-md: 10px;
   --radius-lg: 16px;
   --radius-xl: 22px;
 
   --shadow-sm: 0 1px 4px rgba(0,0,0,0.08);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.14);
-  
+
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --animate-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }

@@ -34,7 +34,7 @@ router.post("/", requireAuth, requireRole("client"), async (req, res) => {
     return res.status(400).json({ error: `Entre 1 et ${MAX_ITEMS_PER_ORDER} articles par commande` });
   }
 
-  const validPayMethods = ["cash", "mobile_money", "card"];
+  const validPayMethods = ["cash", "wave", "orange_money", "moov_money", "mtn_money"];
   if (!validPayMethods.includes(pay_method)) {
     return res.status(400).json({ error: "Méthode de paiement invalide" });
   }

@@ -5,7 +5,7 @@ const prisma = require("../services/prisma");
 const { requireAuth } = require("../middleware/auth");
 const { authLimiter } = require("../middleware/rateLimit");
 
-const REGISTERABLE_TYPES = ["client", "vendor", "livreur", "vendeur"];
+const REGISTERABLE_TYPES = ["client", "vendor", "livreur"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[0-9+\s-]{8,20}$/;
 
@@ -42,7 +42,7 @@ function buildProfilePayload(type, userId, name, phone, body) {
     return { ...base, address: sanitizeString(body.address, 200) || null, active: true };
   }
 
-  if (type === "vendor" || type === "vendeur") {
+  if (type === "vendor") {
     return {
       ...base,
       shopName: sanitizeString(body.shop_name, 100) || name,
@@ -71,7 +71,7 @@ async function createProfile(type, userId, name, phone, body) {
     return prisma.client.create({ data: buildProfilePayload(type, userId, name, phone, body) });
   }
 
-  if (type === "vendor" || type === "vendeur") {
+  if (type === "vendor") {
     return prisma.vendor.create({ data: buildProfilePayload(type, userId, name, phone, body) });
   }
 
@@ -212,9 +212,9 @@ router.post("/login", authLimiter, async (req, res) => {
     const [superAdmin, admin, client, vendor, livreur] = await Promise.all([
       prisma.superadmins.findUnique({ where: { user_id: userId } }),
       prisma.admins.findUnique({ where: { user_id: userId } }),
-      prisma.client.findUnique({ where: { userId } }),
-      prisma.vendor.findUnique({ where: { userId } }),
-      prisma.livreur.findUnique({ where: { userId } })
+      prisma.client.findUnique({ where: { userId: userId } }),
+      prisma.vendor.findUnique({ where: { userId: userId } }),
+      prisma.livreur.findUnique({ where: { userId: userId } })
     ]);
 
     const profile = superAdmin || admin || client || vendor || livreur;

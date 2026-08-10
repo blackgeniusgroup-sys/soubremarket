@@ -60,7 +60,7 @@ export function useOrderTracking(orderId) {
 
   // Abonnement Realtime : position GPS du livreur
   useEffect(() => {
-    const livreurId = order?.livreurId || order?.livreur_id;
+    const livreurId = order?.livreurId;
     if (!livreurId) return;
 
     const livreurSub = supabasePublic

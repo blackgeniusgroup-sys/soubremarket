@@ -64,7 +64,7 @@ export default function VendorDashboard() {
             {orders.map(o => (
               <div key={o.id} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
                 <div>
-                  <p className="text-sm font-medium text-gray-800">{o.orderNumber}</p>
+                  <p className="text-sm font-medium text-gray-800">{o.order_number}</p>
                   <p className="text-xs text-gray-400">{o.orderItems?.length || 0} article(s)</p>
                 </div>
                 <span className="text-sm font-bold text-emerald-700">{o.total?.toLocaleString("fr-FR")} F</span>

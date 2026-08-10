@@ -3,14 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { Products } from "../../api/client";
 import Toast from "../../components/Toast";
 
-const CATS = ["Alimentation","Agriculture","Artisanat","Beauté","Électronique","Vêtements"];
+const CATS = ["alimentation","vetements","electronique","maison","beaute","autres"];
 const EMOJIS = ["📦","🍎","🥕","🌾","🧴","📱","👕","🛒","🍞","🐟","🐔","🥤"];
 
 export default function Publier() {
   const nav = useNavigate();
   const [form, setForm] = useState({
     name: "", description: "", price: "", stock: "",
-    category: "Alimentation", emoji: "📦", featured: false
+    category: "alimentation", emoji: "📦", featured: false
   });
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useCart } from "../../hooks/useCart";
 import { Zones } from "../../api/client";
 import Toast from "../../components/Toast";
+import { Zap, Smartphone, Droplets, Wifi, Banknote } from "lucide-react";
 
 const FALLBACK_ZONES = [
   { id:1, name:"Centre-ville", maxKm:2, price:500 },
@@ -10,6 +11,14 @@ const FALLBACK_ZONES = [
   { id:3, name:"Quartier Sud", maxKm:10, price:1500 },
   { id:4, name:"Périphérie", maxKm:20, price:2500 },
   { id:5, name:"Zone rurale", maxKm:40, price:4000 },
+];
+
+const PAY_METHODS = [
+  { key: "cash",         label: "Cash",          icon: Banknote,   color: "#1D9E75", desc: "À la livraison" },
+  { key: "wave",         label: "Wave",          icon: Zap,         color: "#00A5F0", desc: "Paiement instantané" },
+  { key: "orange_money", label: "Orange Money",  icon: Smartphone,  color: "#FF7900", desc: "Paiement instantané" },
+  { key: "moov_money",   label: "Moov Money",    icon: Droplets,   color: "#0072CE", desc: "Paiement instantané" },
+  { key: "mtn_money",    label: "MTN Money",     icon: Wifi,       color: "#FFCC00", desc: "Paiement instantané" },
 ];
 
 export default function Panier() {
@@ -63,7 +72,11 @@ export default function Panier() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
         {cartItems.map(({ product, qty }) => (
           <div key={product.id} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
-            <span className="text-3xl">{product.emoji}</span>
+            {product.image_url ? (
+              <img src={product.image_url} alt={product.name} className="w-10 h-10 rounded-lg object-cover" />
+            ) : (
+              <span className="text-3xl">{product.emoji}</span>
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-800 truncate">{product.name}</p>
               <p className="text-xs text-gray-400">{product.vendors?.shop_name}</p>
@@ -92,7 +105,7 @@ export default function Panier() {
               className={`rounded-xl p-2 text-center border transition-all ${zone?.id===z.id ? "border-emerald-500 bg-emerald-50" : "border-gray-200 bg-white"}`}>
               <div className="text-xs font-semibold text-gray-800">{z.name}</div>
               <div className={`text-sm font-bold ${zone?.id===z.id?"text-emerald-600":"text-gray-600"}`}>{(z.price||0).toLocaleString("fr-FR")} F</div>
-              <div className="text-xs text-gray-400">≤{z.maxKm || z.max} km</div>
+              <div className="text-xs text-gray-400">≤{z.max_km || z.maxKm} km</div>
             </button>
           ))}
         </div>
@@ -101,12 +114,12 @@ export default function Panier() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">💳 Mode de paiement</h2>
         <div className="grid grid-cols-2 gap-3">
-          {[["cash","💵","Cash","À la livraison"],["wave","📱","Wave / OM","Paiement instantané"]].map(([m,ico,l,s])=>(
-            <button key={m} onClick={()=>setPayMode(m)}
-              className={`rounded-xl p-3 text-center border transition-all ${payMode===m ? "border-emerald-500 bg-emerald-50" : "border-gray-200"}`}>
-              <div className="text-2xl mb-1">{ico}</div>
-              <div className="text-xs font-semibold text-gray-800">{l}</div>
-              <div className="text-xs text-gray-400">{s}</div>
+          {PAY_METHODS.map(({ key, label, icon: Icon, color, desc }) => (
+            <button key={key} onClick={()=>setPayMode(key)}
+              className={`rounded-xl p-3 text-center border transition-all ${payMode===key ? "border-emerald-500 bg-emerald-50" : "border-gray-200"}`}>
+              <Icon size={20} className="mx-auto mb-1" style={{ color }} />
+              <div className="text-xs font-semibold text-gray-800">{label}</div>
+              <div className="text-xs text-gray-400">{desc}</div>
             </button>
           ))}
         </div>

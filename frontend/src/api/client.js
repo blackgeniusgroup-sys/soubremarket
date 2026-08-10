@@ -150,6 +150,13 @@ export const Payments = {
   initiate: (order_id) => api.post("/payments/initiate", { order_id }),
 };
 
+export const Vendor = {
+  products: ()        => api.get("/vendor/products"),
+  clients:  ()        => api.get("/vendor/clients"),
+  notify:   (data)    => api.post("/vendor/notify", data),
+  upload:   (data)    => api.post("/vendor/upload", data),
+};
+
 export const Zones = {
   list: () => api.get("/zones"),
 };

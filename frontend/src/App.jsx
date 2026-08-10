@@ -9,13 +9,13 @@ const Login         = lazy(() => import('./pages/Login'));
 const Register      = lazy(() => import('./pages/Register'));
 
 // Client
-const ClientHome    = lazy(() => import('./pages/client/Home'));
+const ClientHome    = lazy(() => import('./pages/client/CustomerSpace'));
 const Catalogue     = lazy(() => import('./pages/client/Catalogue'));
 const Panier        = lazy(() => import('./pages/client/Panier'));
 const Suivi         = lazy(() => import('./pages/client/Suivi'));
 
 // Vendor
-const VendorDash    = lazy(() => import('./pages/vendor/Dashboard'));
+const VendorDash    = lazy(() => import('./pages/vendor/SellerSpace'));
 const Publier       = lazy(() => import('./pages/vendor/Publier'));
 
 // Livreur
@@ -60,10 +60,10 @@ function PrivateRoute({ children, roles }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Toast />
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
+    <Toast>
+      <BrowserRouter>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
           {/* Public */}
           <Route path="/"          element={<Landing />} />
           <Route path="/login"     element={<Login />} />
@@ -84,7 +84,7 @@ export default function App() {
           <Route path="/livreur/en-cours" element={<PrivateRoute roles={['livreur']}><EnCours /></PrivateRoute>} />
 
           {/* Admin — utilise le même layout que le superadmin (Header + Sidebar) */}
-          <Route path="/admin"             element={<PrivateRoute roles={['admin','superadmin']}><SuperAdminLayout /></PrivateRoute>}>
+          <Route path="/admin"             element={<PrivateRoute roles={['admin']}><SuperAdminLayout /></PrivateRoute>}>
             <Route index element={<AdminDash />} />
             <Route path="vendeurs" element={<AdminDash initialTab="vendors" />} />
             <Route path="clients" element={<AdminDash initialTab="clients" />} />
@@ -111,8 +111,9 @@ export default function App() {
 
           {/* 404 */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
-    </BrowserRouter>
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </Toast>
   );
 }

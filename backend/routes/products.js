@@ -116,7 +116,7 @@ router.get("/:id", async (req, res) => {
   try {
     const { data, error } = await supa
       .from("products")
-      .select(`*, vendors(shop_name, whatsapp, address, logo_url),
+      .select(`*, vendors(shop_name, whatsapp, address),
                comments(id, user_name, rating, text, created_at)`)
       .eq("id", productId)
       .eq("active", true)

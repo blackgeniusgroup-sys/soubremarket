@@ -5,9 +5,9 @@ async function loadProfile(userId) {
   const [superAdmin, admin, client, vendor, livreur] = await Promise.all([
     prisma.superadmins.findUnique({ where: { user_id: userId } }),
     prisma.admins.findUnique({ where: { user_id: userId } }),
-    prisma.client.findUnique({ where: { userId } }),
-    prisma.vendor.findUnique({ where: { userId } }),
-    prisma.livreur.findUnique({ where: { userId } })
+    prisma.client.findUnique({ where: { userId: userId } }),
+    prisma.vendor.findUnique({ where: { userId: userId } }),
+    prisma.livreur.findUnique({ where: { userId: userId } })
   ]);
 
   if (superAdmin) return { ...superAdmin, type: "superadmin" };
