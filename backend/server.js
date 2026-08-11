@@ -50,7 +50,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-app.use(express.json({ limit: "1mb" })); // Limite la taille du corps à 1 Mo
+app.use(express.json({ limit: "10mb" })); // Limite la taille du corps à 10 Mo (pour les uploads d'images base64)
 app.use("/api/", apiLimiter);
 
 app.use((req, res, next) => {

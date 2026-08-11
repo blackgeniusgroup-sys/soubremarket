@@ -58,22 +58,26 @@ model Vendor {
 }
 
 model Livreur {
-  userId       String    @id @map("user_id") @db.Uuid
-  name         String
-  phone        String?
-  status       String    @default("pending")
-  active       Boolean?  @default(false)
-  vehicule     String?
-  zoneTravail  String?   @map("zone_travail")
-  photoUrl     String?   @map("photo_url")
-  currentLat   Decimal?  @map("current_lat") @db.Decimal(10, 7)
-  currentLng   Decimal?  @map("current_lng") @db.Decimal(10, 7)
-  isOnline     Boolean?  @default(false) @map("is_online")
-  adminNote    String?   @map("admin_note")
-  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  profile      users     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  orders       Order[]
+  userId         String    @id @map("user_id") @db.Uuid
+  name           String
+  phone          String?
+  status         String    @default("pending")
+  active         Boolean?  @default(false)
+  vehicule       String?
+  zoneTravail    String?   @map("zone_travail")
+  photoUrl       String?   @map("photo_url")
+  permis         String?   @map("permis")
+  permisRectoUrl String?   @map("permis_recto_url")
+  permisVersoUrl String?   @map("permis_verso_url")
+  cniUrl         String?   @map("cni_url")
+  currentLat     Decimal?  @map("current_lat") @db.Decimal(10, 7)
+  currentLng     Decimal?  @map("current_lng") @db.Decimal(10, 7)
+  isOnline       Boolean?  @default(false) @map("is_online")
+  adminNote      String?   @map("admin_note")
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  profile        users     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  orders         Order[]
 
   @@map("livreurs")
   @@schema("public")

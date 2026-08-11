@@ -87,6 +87,7 @@ export const Auth = {
   register: (data)        => api.post("/auth/register", data),
   logout:   ()            => api.post("/auth/logout"),
   me:       ()            => api.get("/auth/me"),
+  upload:   (data)        => api.post("/auth/upload", data),
 };
 
 export const Products = {

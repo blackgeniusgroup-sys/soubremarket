@@ -44,7 +44,7 @@ router.get("/me", requireAuth, requireRole("livreur"), async (req, res) => {
 
 // POST /api/livreurs/register — inscription livreur
 router.post("/register", requireAuth, requireRole("livreur"), async (req, res) => {
-  const { vehicule, zone_travail, photo_url } = req.body;
+  const { vehicule, zone_travail, photo_url, permis, permis_recto_url, permis_verso_url, cni_url } = req.body;
 
   const cleanVehicule = sanitizeString(vehicule, 100);
   if (!cleanVehicule || cleanVehicule.length < 2) {
@@ -59,6 +59,26 @@ router.post("/register", requireAuth, requireRole("livreur"), async (req, res) =
   const cleanPhotoUrl = sanitizeString(photo_url, 500);
   if (cleanPhotoUrl && !/^https?:\/\/.+/.test(cleanPhotoUrl)) {
     return res.status(400).json({ error: "URL de photo invalide" });
+  }
+
+  const cleanPermis = sanitizeString(permis, 10);
+  if (cleanPermis && !["oui", "non"].includes(cleanPermis)) {
+    return res.status(400).json({ error: "Valeur de permis invalide" });
+  }
+
+  const cleanPermisRecto = sanitizeString(permis_recto_url, 500);
+  if (cleanPermisRecto && !/^https?:\/\/.+/.test(cleanPermisRecto)) {
+    return res.status(400).json({ error: "URL de permis (recto) invalide" });
+  }
+
+  const cleanPermisVerso = sanitizeString(permis_verso_url, 500);
+  if (cleanPermisVerso && !/^https?:\/\/.+/.test(cleanPermisVerso)) {
+    return res.status(400).json({ error: "URL de permis (verso) invalide" });
+  }
+
+  const cleanCniUrl = sanitizeString(cni_url, 500);
+  if (cleanCniUrl && !/^https?:\/\/.+/.test(cleanCniUrl)) {
+    return res.status(400).json({ error: "URL de CNI/Passeport invalide" });
   }
 
   try {
@@ -80,6 +100,10 @@ router.post("/register", requireAuth, requireRole("livreur"), async (req, res) =
       vehicule: cleanVehicule,
       zone_travail: cleanZone,
       photo_url: cleanPhotoUrl,
+      permis: cleanPermis || "non",
+      permis_recto_url: cleanPermisRecto,
+      permis_verso_url: cleanPermisVerso,
+      cni_url: cleanCniUrl,
       status: "pending"
     }).select().single();
     if (error) throw error;

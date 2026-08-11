@@ -65,6 +65,38 @@ export default function AdminLivreurs() {
               </div>
             </div>
 
+            {/* Documents fournis */}
+            {(l.permis || l.permis_recto_url || l.permis_verso_url || l.cni_url || l.cniUrl) && (
+              <div className="bg-gray-50 rounded-lg px-3 py-2 mb-3">
+                <p className="text-xs font-semibold text-gray-600 mb-2">📋 Documents fournis</p>
+                <div className="flex flex-wrap gap-2">
+                  {l.permis && (
+                    <span className={`text-[10px] px-2 py-1 rounded-full font-medium ${l.permis === "oui" ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500"}`}>
+                      🪪 Permis : {l.permis === "oui" ? "Oui" : "Non"}
+                    </span>
+                  )}
+                  {(l.permis_recto_url || l.permisRectoUrl) && (
+                    <a href={l.permis_recto_url || l.permisRectoUrl} target="_blank" rel="noreferrer"
+                      className="text-[10px] px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-medium hover:bg-amber-200">
+                      📄 Permis recto
+                    </a>
+                  )}
+                  {(l.permis_verso_url || l.permisVersoUrl) && (
+                    <a href={l.permis_verso_url || l.permisVersoUrl} target="_blank" rel="noreferrer"
+                      className="text-[10px] px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-medium hover:bg-amber-200">
+                      📄 Permis verso
+                    </a>
+                  )}
+                  {(l.cni_url || l.cniUrl) && (
+                    <a href={l.cni_url || l.cniUrl} target="_blank" rel="noreferrer"
+                      className="text-[10px] px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium hover:bg-blue-200">
+                      🪪 CNI / Passeport
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
             {adminNote && (
               <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-600 mb-3">📝 {adminNote}</div>
             )}

@@ -19,6 +19,7 @@ const VendorDash    = lazy(() => import('./pages/vendor/SellerSpace'));
 const Publier       = lazy(() => import('./pages/vendor/Publier'));
 
 // Livreur
+const DriverDash    = lazy(() => import('./pages/livreur/DriverDashboard'));
 const Missions      = lazy(() => import('./pages/livreur/Missions'));
 const EnCours       = lazy(() => import('./pages/livreur/EnCours'));
 
@@ -80,7 +81,7 @@ export default function App() {
           <Route path="/vendor/publier" element={<PrivateRoute roles={['vendor']}><Publier /></PrivateRoute>} />
 
           {/* Livreur */}
-          <Route path="/livreur"          element={<PrivateRoute roles={['livreur']}><Missions /></PrivateRoute>} />
+          <Route path="/livreur"          element={<PrivateRoute roles={['livreur']}><DriverDash /></PrivateRoute>} />
           <Route path="/livreur/en-cours" element={<PrivateRoute roles={['livreur']}><EnCours /></PrivateRoute>} />
 
           {/* Admin — utilise le même layout que le superadmin (Header + Sidebar) */}
@@ -100,7 +101,7 @@ export default function App() {
             <Route index element={<SuperOverview />} />
             <Route path="vendeurs" element={<SuperVendeurs />} />
             <Route path="clients" element={<AdminDash initialTab="clients" />} />
-            <Route path="livreurs" element={<AdminDash initialTab="livreurs" />} />
+            <Route path="livreurs" element={<AdminLivreurs />} />
             <Route path="admins" element={<AdminDash initialTab="admins" />} />
             <Route path="produits" element={<SuperProduits />} />
             <Route path="commandes" element={<SuperCommandes />} />

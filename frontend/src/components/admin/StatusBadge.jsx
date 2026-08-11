@@ -25,6 +25,8 @@ const STATUS_PRESETS = {
   cash:       { label: "💵 Cash",      classes: "bg-violet-500/10 text-violet-400 border-violet-500/20" },
   card:       { label: "💳 Carte",     classes: "bg-violet-500/10 text-violet-400 border-violet-500/20" },
   mobile:     { label: "📱 Mobile Money", classes: "bg-violet-500/10 text-violet-400 border-violet-500/20" },
+  wave:       { label: "🌊 Wave",      classes: "bg-sky-500/10 text-sky-400 border-sky-500/20" },
+  orange_money:{ label: "🟠 Orange Money", classes: "bg-orange-500/10 text-orange-400 border-orange-500/20" },
   pending_kyc:{ label: "🔍 KYC en cours", classes: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
   kyc_ok:     { label: "🛡 KYC validé", classes: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
   kyc_failed: { label: "🚫 KYC refusé", classes: "bg-red-500/10 text-red-400 border-red-500/20" },

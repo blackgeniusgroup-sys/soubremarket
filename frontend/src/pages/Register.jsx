@@ -1,29 +1,95 @@
 import React, { useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { Auth } from "../api/client";
 import Toast from "../components/Toast";
+
+// Véhicules qui ne nécessitent PAS de permis
+const NO_PERMIS_VEHICULES = ["Vélo", "Scooter électrique"];
 
 export default function Register() {
   const [params]  = useSearchParams();
   const type      = params.get("type") || "client";
   const { register } = useAuth();
   const nav       = useNavigate();
-  const [form, setForm]       = useState({ name:"", email:"", password:"", phone:"", type, vehicule:"Moto", zone:"Centre-ville", shop_name:"", whatsapp:"" });
+  const [form, setForm]       = useState({ name:"", email:"", password:"", phone:"", type, vehicule:"Moto", zone:"Centre-ville", shop_name:"", whatsapp:"", permis:"non" });
   const [photo, setPhoto]     = useState(null);
+  const [permisRecto, setPermisRecto] = useState(null);
+  const [permisVerso, setPermisVerso] = useState(null);
+  const [cniPhoto, setCniPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
   const [done, setDone]       = useState(false);
 
-  const handlePhoto = (e) => {
-    const f = e.target.files[0];
-    if (f) { const r = new FileReader(); r.onload = ev => setPhoto(ev.target.result); r.readAsDataURL(f); }
+  const permisDesactive = NO_PERMIS_VEHICULES.includes(form.vehicule);
+
+  const readFile = (file, setter) => {
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = ev => setter(ev.target.result);
+    r.readAsDataURL(file);
+  };
+
+  const handlePhoto = (e) => readFile(e.target.files[0], setPhoto);
+  const handlePermisRecto = (e) => readFile(e.target.files[0], setPermisRecto);
+  const handlePermisVerso = (e) => readFile(e.target.files[0], setPermisVerso);
+  const handleCniPhoto = (e) => readFile(e.target.files[0], setCniPhoto);
+
+  // Vérifie si le formulaire livreur peut être soumis
+  const validateLivreur = () => {
+    if (!photo) return "La photo d'identification est obligatoire";
+    if (!cniPhoto) return "La photo CNI/Passeport est obligatoire";
+    if (!permisDesactive && form.permis === "oui") {
+      if (!permisRecto) return "La photo du permis (recto) est obligatoire";
+      if (!permisVerso) return "La photo du permis (verso) est obligatoire";
+    }
+    return null;
+  };
+
+  const uploadImage = async (base64, fileName, folder) => {
+    if (!base64) return null;
+    // Extraire l'extension depuis le data URL
+    const match = base64.match(/^data:(image\/(?:jpeg|png|webp|gif));/);
+    const ext = match ? match[1].split("/")[1] : "png";
+    const { url } = await Auth.upload({ file_base64: base64, file_name: `${fileName}.${ext}`, folder });
+    return url;
   };
 
   const handle = async (e) => {
     e.preventDefault();
     setLoading(true); setError(null);
     try {
-      await register({ ...form, photo_url: photo });
+      if (type === "livreur") {
+        const validationError = validateLivreur();
+        if (validationError) throw new Error(validationError);
+      }
+
+      const payload = { ...form };
+
+      // Uploader les images d'abord, puis envoyer les URLs
+      if (type === "livreur") {
+        const uploads = await Promise.all([
+          uploadImage(photo, "photo-profil", "profiles"),
+          uploadImage(cniPhoto, "cni-passeport", "documents"),
+        ]);
+        payload.photo_url = uploads[0];
+        payload.cni_url = uploads[1];
+        payload.permis = permisDesactive ? "non" : (form.permis || "non");
+
+        if (!permisDesactive && payload.permis === "oui") {
+          const [rectoUrl, versoUrl] = await Promise.all([
+            uploadImage(permisRecto, "permis-recto", "documents"),
+            uploadImage(permisVerso, "permis-verso", "documents"),
+          ]);
+          payload.permis_recto_url = rectoUrl;
+          payload.permis_verso_url = versoUrl;
+        } else {
+          payload.permis_recto_url = null;
+          payload.permis_verso_url = null;
+        }
+      }
+
+      await register(payload);
       setDone(true);
     } catch (err) {
       setError(err.message);
@@ -108,13 +174,74 @@ export default function Register() {
 
             {type === "livreur" && (
               <>
+                {/* Véhicule */}
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Véhicule</label>
                   <select value={form.vehicule} onChange={e=>setForm(f=>({...f,vehicule:e.target.value}))}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                    {["Moto","Moto électrique","Vélo","Voiture","Tricycle"].map(v=><option key={v}>{v}</option>)}
+                    {["Moto","Moto électrique","Vélo","Scooter électrique","Voiture","Tricycle"].map(v=><option key={v}>{v}</option>)}
+                  </select>
+                  {permisDesactive && (
+                    <p className="text-xs text-emerald-600 mt-1">ℹ️ Pas de permis requis pour ce véhicule.</p>
+                  )}
+                </div>
+
+                {/* Permis de conduire — désactivé pour Vélo / Scooter électrique */}
+                <div className={permisDesactive ? "opacity-50 pointer-events-none" : ""}>
+                  <label className="block text-xs text-gray-500 mb-1">Permis de conduire</label>
+                  <select value={form.permis} onChange={e=>setForm(f=>({...f,permis:e.target.value}))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                    <option value="non">Non</option>
+                    <option value="oui">Oui</option>
                   </select>
                 </div>
+
+                {/* Photos du permis — seulement si permis = oui et véhicule non exempt */}
+                {!permisDesactive && form.permis === "oui" && (
+                  <div className="bg-amber-50/50 border border-amber-200 rounded-lg p-3 space-y-3">
+                    <p className="text-xs font-semibold text-amber-700">🪪 Permis de conduire — recto / verso</p>
+
+                    <div className="flex gap-2">
+                      {/* Recto */}
+                      <div className="flex-1">
+                        <div onClick={() => document.getElementById("permis-recto-input").click()}
+                          className="h-24 bg-white border-2 border-dashed border-amber-300 rounded-lg flex items-center justify-center cursor-pointer overflow-hidden hover:bg-amber-50 transition-colors">
+                          {permisRecto ? <img src={permisRecto} alt="Permis recto" className="w-full h-full object-cover" /> : <span className="text-xs text-amber-500 text-center px-1">📄 Recto</span>}
+                        </div>
+                        <input id="permis-recto-input" type="file" accept="image/*" className="hidden" onChange={handlePermisRecto} />
+                        <p className="text-[10px] text-gray-400 mt-1 text-center">Recto *</p>
+                      </div>
+
+                      {/* Verso */}
+                      <div className="flex-1">
+                        <div onClick={() => document.getElementById("permis-verso-input").click()}
+                          className="h-24 bg-white border-2 border-dashed border-amber-300 rounded-lg flex items-center justify-center cursor-pointer overflow-hidden hover:bg-amber-50 transition-colors">
+                          {permisVerso ? <img src={permisVerso} alt="Permis verso" className="w-full h-full object-cover" /> : <span className="text-xs text-amber-500 text-center px-1">📄 Verso</span>}
+                        </div>
+                        <input id="permis-verso-input" type="file" accept="image/*" className="hidden" onChange={handlePermisVerso} />
+                        <p className="text-[10px] text-gray-400 mt-1 text-center">Verso *</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* CNI / Passeport — toujours requis */}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">CNI / Passeport *</label>
+                  <div onClick={() => document.getElementById("cni-input").click()}
+                    className="h-24 bg-white border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer overflow-hidden hover:bg-gray-50 transition-colors">
+                    {cniPhoto ? <img src={cniPhoto} alt="CNI/Passeport" className="w-full h-full object-cover" /> : (
+                      <div className="text-center">
+                        <span className="text-2xl block">🪪</span>
+                        <span className="text-xs text-gray-400">Cliquer pour charger</span>
+                      </div>
+                    )}
+                  </div>
+                  <input id="cni-input" type="file" accept="image/*" className="hidden" onChange={handleCniPhoto} />
+                  <p className="text-[10px] text-gray-400 mt-1">Photo de votre CNI ou Passeport (recto)</p>
+                </div>
+
+                {/* Zone de travail */}
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Zone de travail</label>
                   <select value={form.zone} onChange={e=>setForm(f=>({...f,zone:e.target.value}))}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Admin, Orders as OrdersAPI, Products as ProductsAPI, Livreurs as LivreursAPI } from "../../api/client";
 import { useAuth } from "../../hooks/useAuth";
+import LiveDriverMap from "../../components/admin/LiveDriverMap";
 
 const fmtFCFA = (n) => (Number(n) || 0).toLocaleString("fr-FR") + " F";
 const fmtNum = (n) => (Number(n) || 0).toLocaleString("fr-FR");
@@ -340,6 +341,21 @@ export default function AdminDashboard({ initialTab = "overview" }) {
             <PillCard color="from-orange-600 to-orange-400" icon="🛍️" label="Panier Moyen" value={fmtFCFA(gmv/Math.max(to,1))} sub="Par commande" />
             <PillCard color="from-lime-600 to-lime-400" icon="💬" label="Avis en attente" value={fmtNum(pc)} sub="À modérer" />
             <PillCard color="from-amber-700 to-amber-500" icon="🚚" label="Livreurs en attente" value={fmtNum(pl)} sub="Validation requise" />
+          </div>
+
+          {/* ═══════════ SUIVI DES LIVREURS EN DIRECT ═══════════ */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-100">🛰️ Suivi des Livreurs en Direct</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Localisation temps réel et statut de la flotte</p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-medium text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Mise à jour auto 4s
+              </span>
+            </div>
+            <LiveDriverMap />
           </div>
         </>
       )}

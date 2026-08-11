@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   User, Package, Heart, MapPin, Store, ChevronRight, Menu,
   LogOut, Home, Trash2, Plus, Pencil, Download, Truck, CheckCircle2,
   XCircle, Clock, ShoppingCart, AlertTriangle, Sparkles, Search, ArrowRight,
   Check, Shield, Sun, Moon, Palette, Smartphone, Zap, Droplets, Wifi,
-  Minus, Tag, Lock, Wallet, Save, RefreshCw, Store as StoreIcon
+  Minus, Tag, Lock, Wallet, Save, RefreshCw, Store as StoreIcon, Bell
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { useOrders } from "../../hooks/useOrders";
@@ -20,6 +20,16 @@ const fmtFCFA = (n) => (Number(n) || 0).toLocaleString("fr-FR") + " F";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 const fmtTime = (d) => d ? new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
 const init = (name) => name?.split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase() || "?";
+
+// Message de bienvenue selon l'heure : 00h-12h = Bonjour, 12h-23h59 = Bonsoir
+const getGreeting = () => {
+  const h = new Date().getHours();
+  return h >= 0 && h < 12 ? "Bonjour" : "Bonsoir";
+};
+const getGreetingEmoji = () => {
+  const h = new Date().getHours();
+  return h >= 6 && h < 18 ? "☀️" : "🌙";
+};
 
 const ORDER_STEPS = [
   { key: "pending",    label: "Validée",         icon: CheckCircle2 },
@@ -434,10 +444,13 @@ function ProfileModule({ dark }) {
   const inputCls = `w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 ${dark ? "bg-slate-800 border-slate-700 text-white placeholder-gray-500" : "border-gray-200 text-gray-900 placeholder-gray-400"}`;
   const labelCls = `block text-xs font-medium mb-1 ${dark ? "text-gray-400" : "text-gray-500"}`;
 
+  const greeting = getGreeting();
+  const greetingEmoji = getGreetingEmoji();
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className={`text-2xl font-bold ${dark ? "text-white" : "text-gray-900"}`}>Mon Profil</h1>
+        <h1 className={`text-2xl font-bold ${dark ? "text-white" : "text-gray-900"}`}>{greetingEmoji} {greeting}, {profile?.name?.split(" ")[0] || "cher client"} !</h1>
         <p className={`text-sm mt-0.5 ${dark ? "text-gray-400" : "text-gray-500"}`}>Gérez vos informations personnelles</p>
       </div>
 
@@ -485,6 +498,64 @@ function ProfileModule({ dark }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODULE : NOTIFICATIONS
+   ═══════════════════════════════════════════════════════════ */
+function NotificationsModule({ dark }) {
+  const { orders } = useOrders({ limit: 50 });
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    const deliveredOrders = orders.filter(o => o.status === "delivered");
+    const notifs = deliveredOrders.map(order => ({
+      id: order.id,
+      type: "delivered",
+      title: "Colis livré !",
+      message: `Votre commande ${order.orderNumber || order.id.slice(0, 8)} a été livrée avec succès.`,
+      date: order.updatedAt || order.createdAt,
+      orderId: order.id,
+    }));
+    setNotifications(notifs);
+  }, [orders]);
+
+  const unreadCount = notifications.length;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className={`text-2xl font-bold ${dark ? "text-white" : "text-gray-900"}`}>Notifications</h1>
+        <p className={`text-sm mt-0.5 ${dark ? "text-gray-400" : "text-gray-500"}`}>
+          {unreadCount > 0 ? `${unreadCount} notification(s)` : "Aucune notification"}
+        </p>
+      </div>
+
+      {notifications.length === 0 ? (
+        <div className={`text-center py-16 rounded-2xl border ${dark ? "border-slate-800 text-gray-500" : "border-gray-100 text-gray-400"}`}>
+          <div className="text-5xl mb-3">🔔</div>
+          <p className="text-sm">Aucune notification pour le moment.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {notifications.map(notif => (
+            <div key={notif.id} className={`rounded-2xl border p-4 flex items-start gap-4 ${dark ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"}`}>
+              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <CheckCircle2 size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-semibold ${dark ? "text-white" : "text-gray-900"}`}>{notif.title}</p>
+                <p className={`text-xs mt-0.5 ${dark ? "text-gray-400" : "text-gray-500"}`}>{notif.message}</p>
+                <p className={`text-[10px] mt-1 ${dark ? "text-gray-600" : "text-gray-400"}`}>
+                  {notif.date ? new Date(notif.date).toLocaleString("fr-FR") : ""}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1227,7 +1298,8 @@ function AddressesModule({ dark, showToast }) {
 export default function CustomerSpace() {
   const { profile, user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("profile");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") || "profile");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dark, setDark] = useState(() => localStorage.getItem("soubremarket_client_theme") === "dark");
   const [sidebarColor, setSidebarColor] = useState(() => localStorage.getItem("soubremarket_client_sidebar_color") || "emerald");
@@ -1254,6 +1326,7 @@ export default function CustomerSpace() {
   const NAV_ITEMS = [
     { key: "profile",   label: "Mon Profil",          icon: User,      desc: "Informations personnelles" },
     { key: "orders",    label: "Mes Commandes",       icon: Package,   desc: "Suivi & historiques" },
+    { key: "notifications", label: "Notifications",   icon: Bell,      desc: "Centre de notifications" },
     { key: "wishlist",  label: "Ma Liste d'envies",   icon: Heart,     desc: "Produits sauvegardés" },
     { key: "addresses", label: "Adresses & Paiement", icon: MapPin,    desc: "Livraison & mobile money" },
     { key: "cart",      label: "Mon Panier",          icon: ShoppingCart, desc: cartCount > 0 ? `${cartCount} article(s)` : "Voir le panier" },
@@ -1381,31 +1454,34 @@ export default function CustomerSpace() {
 
       {/* ─── Zone principale ─── */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className={`lg:hidden border-b px-4 py-3 flex items-center justify-between sticky top-0 z-30 transition-colors ${dark ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}>
-          <button onClick={() => setSidebarOpen(true)} className={`p-2 rounded-lg hover:bg-gray-100 ${dark ? "text-white hover:bg-slate-800" : "text-gray-700"}`}>
-            <Menu size={20} />
-          </button>
-          <div className="flex items-center gap-2">
-            <Store size={18} className="text-emerald-600" />
-            <span className={`font-bold text-sm ${dark ? "text-white" : "text-gray-900"}`}>Espace Client</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setDark(d => !d)}
-              className={`p-2 rounded-lg transition-colors ${dark ? "text-amber-400 hover:bg-slate-800" : "text-gray-600 hover:bg-gray-100"}`}
-              title={dark ? "Mode clair" : "Mode sombre"}
-            >
-              {dark ? <Sun size={18} /> : <Moon size={18} />}
+        <header className={`lg:hidden border-b px-4 py-3 sticky top-0 z-30 transition-colors ${dark ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}>
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={() => setSidebarOpen(true)} className={`p-2 rounded-lg hover:bg-gray-100 ${dark ? "text-white hover:bg-slate-800" : "text-gray-700"}`}>
+              <Menu size={20} />
             </button>
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700">
-              {initials}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setDark(d => !d)}
+                className={`p-2 rounded-lg transition-colors ${dark ? "text-amber-400 hover:bg-slate-800" : "text-gray-600 hover:bg-gray-100"}`}
+                title={dark ? "Mode clair" : "Mode sombre"}
+              >
+                {dark ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700">
+                {initials}
+              </div>
             </div>
           </div>
+          {/* Message de bienvenue dynamique selon l'heure */}
+          <p className={`text-sm font-medium ${dark ? "text-gray-300" : "text-gray-600"}`}>
+            {getGreetingEmoji()} {getGreeting()}, {profile?.name?.split(" ")[0] || "cher client"} !
+          </p>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {activeTab === "profile" && <ProfileModule dark={dark} />}
           {activeTab === "orders" && <OrdersModule dark={dark} />}
+          {activeTab === "notifications" && <NotificationsModule dark={dark} />}
           {activeTab === "wishlist" && <WishlistModule dark={dark} showToast={showToast} />}
           {activeTab === "addresses" && <AddressesModule dark={dark} showToast={showToast} />}
           {activeTab === "cart" && <CartModule dark={dark} showToast={showToast} />}

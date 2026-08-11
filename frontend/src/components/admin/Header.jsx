@@ -38,7 +38,12 @@ export default function Header({ onMenuClick, period, onPeriodChange }) {
     e.preventDefault();
     const q = search.trim();
     if (!q) return;
-    navigate(`/superadmin/recherche?q=${encodeURIComponent(q)}`);
+    // Rediriger vers la page la plus pertinente selon le rôle
+    if (profile?.type === "superadmin") {
+      navigate(`/superadmin/produits?q=${encodeURIComponent(q)}`);
+    } else {
+      navigate(`/admin/produits?q=${encodeURIComponent(q)}`);
+    }
   };
 
   const currentPeriod = PERIODS.find(p => p.key === period) || PERIODS[0];

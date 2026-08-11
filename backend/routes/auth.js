@@ -8,6 +8,7 @@ const { authLimiter } = require("../middleware/rateLimit");
 const REGISTERABLE_TYPES = ["client", "vendor", "livreur"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[0-9+\s-]{8,20}$/;
+const VALID_UPLOAD_FOLDERS = ["profiles", "documents"];
 
 function validateEmail(email) {
   return typeof email === "string" && email.length <= 254 && EMAIL_REGEX.test(email);
@@ -59,7 +60,11 @@ function buildProfilePayload(type, userId, name, phone, body) {
       active: false,
       vehicule: sanitizeString(body.vehicule, 100) || null,
       zoneTravail: sanitizeString(body.zone_travail || body.zone, 100) || null,
-      photoUrl: sanitizeString(body.photo_url, 500) || null
+      photoUrl: sanitizeString(body.photo_url, 500) || null,
+      permis: sanitizeString(body.permis, 10) || null,
+      permisRectoUrl: sanitizeString(body.permis_recto_url, 500) || null,
+      permisVersoUrl: sanitizeString(body.permis_verso_url, 500) || null,
+      cniUrl: sanitizeString(body.cni_url, 500) || null
     };
   }
 
@@ -142,6 +147,74 @@ router.post("/register", authLimiter, async (req, res) => {
   } catch (err) {
     console.error("Erreur inscription:", err);
     res.status(500).json({ error: "Erreur lors de la création du compte" });
+  }
+});
+
+// POST /api/auth/upload — upload d'image pour profil ou documents livreur
+router.post("/upload", async (req, res) => {
+  const { file_base64, file_name, folder = "profiles" } = req.body;
+
+  if (!file_base64 || typeof file_base64 !== "string") {
+    return res.status(400).json({ error: "Données d'image manquantes" });
+  }
+  if (!file_name || typeof file_name !== "string") {
+    return res.status(400).json({ error: "Nom de fichier manquant" });
+  }
+  if (!VALID_UPLOAD_FOLDERS.includes(folder)) {
+    return res.status(400).json({ error: "Dossier invalide" });
+  }
+
+  // Valider la taille (max 5 Mo)
+  const base64Size = Buffer.byteLength(file_base64, "base64");
+  if (base64Size > 5 * 1024 * 1024) {
+    return res.status(400).json({ error: "Image trop volumineuse (max 5 Mo)" });
+  }
+
+  // Vérifier que c'est bien une image (data URL ou base64 pur)
+  if (file_base64.includes("data:image/")) {
+    const mimeMatch = file_base64.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,/);
+    if (!mimeMatch) {
+      return res.status(400).json({ error: "Format d'image invalide (JPG, PNG, WEBP, GIF)" });
+    }
+  }
+
+  try {
+    // Nettoyer le nom de fichier
+    const cleanName = file_name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+    const ext = cleanName.split(".").pop() || "png";
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).slice(2, 8);
+    const path = `${folder}/${timestamp}-${random}.${ext}`;
+
+    // Extraire le base64 pur si c'est une data URL
+    const pureBase64 = file_base64.includes(",") ? file_base64.split(",")[1] : file_base64;
+
+    // Décoder le base64
+    const buffer = Buffer.from(pureBase64, "base64");
+
+    // Upload vers Supabase Storage
+    const { data, error } = await supa.storage
+      .from("soubremarket")
+      .upload(path, buffer, {
+        contentType: `image/${ext === "jpg" ? "jpeg" : ext}`,
+        upsert: false,
+      });
+
+    if (error) throw error;
+
+    // Générer l'URL publique
+    const { data: publicData } = supa.storage
+      .from("soubremarket")
+      .getPublicUrl(path);
+
+    res.status(201).json({
+      message: "Image uploadée avec succès",
+      url: publicData.publicUrl,
+      path,
+    });
+  } catch (err) {
+    console.error("Erreur upload auth:", err);
+    res.status(500).json({ error: "Erreur lors de l'upload de l'image" });
   }
 });
 

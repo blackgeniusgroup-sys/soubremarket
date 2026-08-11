@@ -71,13 +71,24 @@ CREATE TABLE vendors (
 );
 
 CREATE TABLE livreurs (
-  user_id    UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  name       TEXT NOT NULL,
-  phone      TEXT,
-  status     TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected','suspended')),
-  active     BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  user_id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  name             TEXT NOT NULL,
+  phone            TEXT,
+  status           TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected','suspended')),
+  active           BOOLEAN DEFAULT FALSE,
+  vehicule         TEXT,
+  zone_travail     TEXT,
+  photo_url        TEXT,
+  permis           TEXT DEFAULT 'non' CHECK (permis IN ('oui','non')),
+  permis_recto_url TEXT,
+  permis_verso_url TEXT,
+  cni_url          TEXT,
+  current_lat      NUMERIC(10,7),
+  current_lng      NUMERIC(10,7),
+  is_online        BOOLEAN DEFAULT FALSE,
+  admin_note       TEXT,
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Trigger : crée automatiquement un profil client à l'inscription si le type est client
