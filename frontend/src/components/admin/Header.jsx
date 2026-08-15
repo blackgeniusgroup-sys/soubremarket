@@ -1,10 +1,12 @@
 /**
  * Header — Barre supérieure du dashboard superadmin.
- * Contient : toggle mobile, recherche globale, notifications, période.
+ * Contient : toggle mobile, recherche globale, notifications (données réelles), période.
+ * Les notifications proviennent de la base de données via l'API /admin/notifications.
  */
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
+import { Admin } from "../../api/client";
 
 const PERIODS = [
   { key: "today", label: "Aujourd'hui" },
@@ -13,17 +15,64 @@ const PERIODS = [
   { key: "year", label: "Cette année" },
 ];
 
+const NOTIF_ICONS = {
+  system: "🔔",
+  success: "✅",
+  warning: "⚠️",
+  danger: "❌",
+  info: "ℹ️",
+};
+
+const fmtTimeAgo = (dateStr) => {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffH = Math.floor(diffMin / 60);
+  const diffD = Math.floor(diffH / 24);
+  if (diffMin < 1) return "À l'instant";
+  if (diffMin < 60) return `Il y a ${diffMin} min`;
+  if (diffH < 24) return `Il y a ${diffH} h`;
+  if (diffD < 7) return `Il y a ${diffD} jour${diffD > 1 ? "s" : ""}`;
+  return d.toLocaleDateString("fr-FR");
+};
+
 export default function Header({ onMenuClick, period, onPeriodChange }) {
   const { logout, profile } = useAuth();
   const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
   const [periodOpen, setPeriodOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifLoading, setNotifLoading] = useState(true);
   const notifRef = useRef(null);
   const periodRef = useRef(null);
   const email = profile?.email || "admin@soubremarket.com";
   const name = profile?.name || "Super Admin";
   const initials = name.split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase();
+
+  const fetchNotifications = () => {
+    setNotifLoading(true);
+    Admin.notifications()
+      .then(res => {
+        setNotifications(res.notifications || []);
+        setUnreadCount(res.unreadCount || 0);
+      })
+      .catch(() => {
+        setNotifications([]);
+        setUnreadCount(0);
+      })
+      .finally(() => setNotifLoading(false));
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // Polling toutes les 60 secondes
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handler = (e) => {
@@ -48,12 +97,10 @@ export default function Header({ onMenuClick, period, onPeriodChange }) {
 
   const currentPeriod = PERIODS.find(p => p.key === period) || PERIODS[0];
 
-  const notifications = [
-    { id: 1, icon: "🏪", text: "3 nouveaux vendeurs en attente de validation", time: "Il y a 5 min", type: "info" },
-    { id: 2, icon: "⚠️", text: "2 signalements de produits reçus", time: "Il y a 1 h", type: "danger" },
-    { id: 3, icon: "💰", text: "Commission du mois en hausse de 12%", time: "Il y a 3 h", type: "success" },
-  ];
-  const unreadCount = 2;
+  const markAllRead = () => {
+    setNotifications(ns => ns.map(n => ({ ...n, read: true })));
+    setUnreadCount(0);
+  };
 
   return (
     <header className="h-16 bg-slate-900/80 backdrop-blur border-b border-slate-800 flex items-center gap-3 px-4 sm:px-6 shrink-0 sticky top-0 z-30">
@@ -152,20 +199,45 @@ export default function Header({ onMenuClick, period, onPeriodChange }) {
             <div className="absolute right-0 top-12 w-80 max-w-[85vw] bg-slate-800 border border-slate-700 rounded-2xl shadow-xl overflow-hidden z-50">
               <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
                 <p className="text-sm font-semibold text-slate-100">Notifications</p>
-                <button className="text-[11px] text-emerald-400 hover:text-emerald-300">Tout marquer lu</button>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllRead}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300"
+                  >
+                    Tout marquer lu
+                  </button>
+                )}
               </div>
               <div className="max-h-72 overflow-y-auto">
-                {notifications.map(n => (
-                  <div key={n.id} className={`flex items-start gap-3 px-4 py-3 hover:bg-slate-700/40 transition-colors cursor-pointer border-b border-slate-700/50 ${n.type === "danger" ? "bg-red-500/5" : ""}`}>
-                    <span className="text-lg shrink-0">{n.icon}</span>
-                    <div className="min-w-0">
-                      <p className="text-xs text-slate-200 leading-snug">{n.text}</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{n.time}</p>
-                    </div>
+                {notifLoading ? (
+                  <div className="px-4 py-6 text-center text-gray-500 text-xs">
+                    Chargement des notifications...
                   </div>
-                ))}
+                ) : notifications.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-gray-500 text-xs">
+                    Aucune notification
+                  </div>
+                ) : (
+                  notifications.map(n => (
+                    <div
+                      key={n.id}
+                      className={`flex items-start gap-3 px-4 py-3 hover:bg-slate-700/40 transition-colors cursor-pointer border-b border-slate-700/50 ${
+                        n.type === "danger" ? "bg-red-500/5" : ""
+                      } ${!n.read ? "bg-slate-800/40" : ""}`}
+                    >
+                      <span className="text-lg shrink-0">{NOTIF_ICONS[n.type] || "🔔"}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs text-slate-200 leading-snug">{n.title || n.message}</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">{fmtTimeAgo(n.created_at)}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-              <button className="w-full py-2.5 text-xs font-medium text-slate-300 hover:bg-slate-700/50 transition-colors">
+              <button
+                onClick={() => { setNotifOpen(false); navigate("/superadmin/moderation"); }}
+                className="w-full py-2.5 text-xs font-medium text-slate-300 hover:bg-slate-700/50 transition-colors"
+              >
                 Voir toutes les notifications →
               </button>
             </div>

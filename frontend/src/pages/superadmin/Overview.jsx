@@ -33,43 +33,40 @@ export default function Overview() {
   const [stats, setStats] = useState(null);
   const [orders, setOrders] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [vendorCategories, setVendorCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     let mounted = true;
     setLoading(true);
+    setError(null);
     Promise.all([
       Admin.stats(),
       OrdersAPI.list({ limit: 5 }),
       Admin.users({ type: "vendor", active: "false" }),
+      Admin.financesMonthly(),
+      Admin.vendorCategories(),
     ])
-      .then(([s, o, v]) => {
+      .then(([s, o, v, m, c]) => {
         if (!mounted) return;
         setStats(s);
         setOrders(o.orders || []);
         setVendors(v.users || []);
+        setMonthlyData(m.monthly || []);
+        setVendorCategories(c.categories || []);
       })
-      .catch(console.error)
+      .catch(err => {
+        if (!mounted) return;
+        setError(err.message || "Erreur lors du chargement des données");
+      })
       .finally(() => mounted && setLoading(false));
     return () => { mounted = false; };
   }, [period]);
 
-  const revenueData = useMemo(() => {
-    const base = stats?.total_commission || 0;
-    return [
-      { label: "Jan", value: Math.round(base * 0.3) },
-      { label: "Fév", value: Math.round(base * 0.45) },
-      { label: "Mar", value: Math.round(base * 0.4) },
-      { label: "Avr", value: Math.round(base * 0.6) },
-      { label: "Mai", value: Math.round(base * 0.55) },
-      { label: "Juin", value: Math.round(base * 0.75) },
-      { label: "Juil", value: Math.round(base * 0.8) },
-      { label: "Août", value: Math.round(base * 1.0) },
-    ];
-  }, [stats]);
-
   const pendingVendors = vendors.filter(v => !v.active);
-  const gmv = (stats?.total_orders || 0) * 5000;
+  const gmv = stats?.total_gmv || 0;
   const totalCommission = stats?.total_commission || 0;
   const totalVendors = stats?.total_vendors || 0;
   const totalOrders = stats?.total_orders || 0;
@@ -80,6 +77,17 @@ export default function Overview() {
         <div className="text-center">
           <div className="text-4xl mb-3">📊</div>
           <p className="text-sm text-gray-400">Chargement du tableau de bord...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-4xl mb-3">⚠️</div>
+          <p className="text-sm text-red-400">{error}</p>
         </div>
       </div>
     );
@@ -126,7 +134,7 @@ export default function Overview() {
           </div>
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-medium text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Mise à jour auto 4s
+            Mise à jour auto 30s
           </span>
         </div>
         <LiveDriverMap />
@@ -196,9 +204,15 @@ export default function Overview() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5">
-          <h2 className="text-sm font-semibold text-slate-100 mb-1">Répartition des Vendeurs par Catégorie</h2>
-          <p className="text-xs text-gray-500 mb-4">Proportion des catégories de produits</p>
-          <DonutChart data={[]} size={170} />
+          <h2 className="text-sm font-semibold text-slate-100 mb-1">Répartition des Produits par Catégorie</h2>
+          <p className="text-xs text-gray-500 mb-4">Proportion des catégories de produits actifs</p>
+          {vendorCategories.length > 0 ? (
+            <DonutChart data={vendorCategories} size={170} />
+          ) : (
+            <div className="flex items-center justify-center h-40 text-gray-500 text-xs">
+              Aucune catégorie de produit disponible
+            </div>
+          )}
         </div>
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5">
           <h2 className="text-sm font-semibold text-slate-100 mb-1">Dernières Commandes</h2>
@@ -221,10 +235,16 @@ export default function Overview() {
         </div>
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 md:col-span-2 xl:col-span-1">
           <h2 className="text-sm font-semibold text-slate-100 mb-1">Évolution mensuelle des Commissions</h2>
-          <p className="text-xs text-gray-500 mb-4">Revenus plateforme sur 8 mois</p>
-          <div className="h-52">
-            <LineChart data={revenueData} color="#0EA5E9" gradient />
-          </div>
+          <p className="text-xs text-gray-500 mb-4">Revenus plateforme sur 12 mois</p>
+          {monthlyData.length > 0 ? (
+            <div className="h-52">
+              <LineChart data={monthlyData} color="#0EA5E9" gradient />
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-52 text-gray-500 text-xs">
+              Aucune donnée financière disponible
+            </div>
+          )}
         </div>
       </div>
     </div>

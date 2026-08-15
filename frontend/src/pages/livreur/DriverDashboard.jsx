@@ -15,54 +15,7 @@ const fmtEuro = (n) => (Number(n) || 0).toFixed(2) + " €";
 const fmtTime = (d) => d ? new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "";
 
-// Historique pré-rempli (3 livraisons réalistes)
-const INITIAL_HISTORY = [
-  {
-    id: "CMD-1042",
-    vendor: "Sushi Bar",
-    pickup: "12 Rue de la Paix, Soubré",
-    dropoff: "8 Av. des Cocotiers, Soubré",
-    distance: 2.4,
-    base: 8.5,
-    tip: 2.0,
-    status: "delivered",
-    date: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-  {
-    id: "CMD-1038",
-    vendor: "Pizzeria Roma",
-    pickup: "5 Bd du Commerce, Soubré",
-    dropoff: "23 Rue des Manguiers, Soubré",
-    distance: 3.1,
-    base: 9.0,
-    tip: 1.5,
-    status: "delivered",
-    date: new Date(Date.now() - 86400000 * 1).toISOString(),
-  },
-  {
-    id: "CMD-1031",
-    vendor: "Boulangerie Dorée",
-    pickup: "2 Place du Marché, Soubré",
-    dropoff: "15 Rue des Palmiers, Soubré",
-    distance: 1.8,
-    base: 6.5,
-    tip: 0,
-    status: "delivered",
-    date: new Date(Date.now() - 86400000 * 0.5).toISOString(),
-  },
-];
-
-// Nouvelle course simulée
-const NEW_OFFER = {
-  id: "CMD-1050",
-  vendor: "Sushi Bar",
-  pickup: "12 Rue de la Paix, Soubré",
-  dropoff: "8 Av. des Cocotiers, Soubré",
-  distance: 2.4,
-  base: 8.5,
-  tip: 2.0,
-  status: "offered",
-};
+// Aucune donnée mockée. Toutes les données proviennent de l'API /orders.
 
 /* ═══════════════════════════════════════════════════════════
    COMPOSANT : BANNIÈRE PUSH NOTIFICATION
@@ -200,7 +153,7 @@ function ActiveCourseView({ online, setOnline, state, setState, offer, onConfirm
             </div>
             <div>
               <p className="font-bold text-gray-900">{offer.vendor}</p>
-              <p className="text-xs text-gray-400">{offer.id}</p>
+              <p className="text-xs text-gray-400">{offer.orderNumber || offer.id}</p>
             </div>
           </div>
 
@@ -259,7 +212,7 @@ function ActiveCourseView({ online, setOnline, state, setState, offer, onConfirm
               <Navigation size={12} />
               En route
             </span>
-            <span className="text-xs text-gray-400">{offer.id}</span>
+            <span className="text-xs text-gray-400">{offer.orderNumber || offer.id}</span>
           </div>
 
           <div className="space-y-3 mb-4">
@@ -315,7 +268,7 @@ function ActiveCourseView({ online, setOnline, state, setState, offer, onConfirm
               <Camera size={12} />
               Preuve de livraison
             </span>
-            <span className="text-xs text-gray-400">{offer.id}</span>
+            <span className="text-xs text-gray-400">{offer.orderNumber || offer.id}</span>
           </div>
 
           {/* Upload photo */}
@@ -505,10 +458,34 @@ export default function DriverDashboard() {
   const [online, setOnline] = useState(true);
   const [tab, setTab] = useState("active");
   const [state, setState] = useState("idle");
-  const [offer, setOffer] = useState(NEW_OFFER);
-  const [history, setHistory] = useState(INITIAL_HISTORY);
+  const [offer, setOffer] = useState(null);
+  const [history, setHistory] = useState([]);
   const [pushVisible, setPushVisible] = useState(false);
   const [pushError, setPushError] = useState(false);
+
+  // Charger les vraies commandes disponibles (pending) et les missions livrées du livreur
+  const { orders: pendingOrders, refetch: refetchPending } = useOrders({ status: "pending" });
+  const { orders: myOrders, refetch: refetchMine } = useOrders({ limit: 20 });
+
+  // Hydrater l'historique depuis les vraies commandes livrées du livreur
+  useEffect(() => {
+    if (myOrders?.length > 0) {
+      const delivered = myOrders
+        .filter(o => o.status === "delivered")
+        .map(o => ({
+          id: o.orderNumber || o.id,
+          vendor: o.vendor?.shopName || "Vendeur",
+          pickup: o.vendor?.address || "Retrait",
+          dropoff: o.client?.address || "Livraison",
+          distance: o.zone?.max_km || 0,
+          base: o.total || 0,
+          tip: 0,
+          status: "delivered",
+          date: o.createdAt || o.created_at,
+        }));
+      setHistory(delivered);
+    }
+  }, [myOrders]);
 
   // GPS actif quand en ligne
   useLivreurGPS(online);
@@ -533,29 +510,61 @@ export default function DriverDashboard() {
   const openPush = () => {
     setPushVisible(false);
     setTab("active");
-    setState("offered");
-    setOffer(NEW_OFFER);
+    // Prendre la première commande disponible de l'API
+    if (pendingOrders.length > 0) {
+      const order = pendingOrders[0];
+      setOffer({
+        id: order.id, // UUID réel pour l'API
+        orderNumber: order.orderNumber || order.id, // numéro pour l'affichage
+        vendor: order.vendor?.shopName || "Vendeur",
+        pickup: order.vendor?.address || "Retrait",
+        dropoff: order.client?.address || "Livraison",
+        distance: order.zone?.max_km || 0,
+        base: order.total || 0,
+        tip: 0,
+        status: "offered",
+      });
+      setState("offered");
+    } else {
+      setState("idle");
+    }
   };
 
   const acceptOffer = () => {
+    if (offer?.id) {
+      // Accepter la mission via l'API
+      Orders.setStatus(offer.id, "assigned").then(() => {
+        refetchPending();
+        refetchMine();
+      }).catch(console.error);
+    }
     setState("picked");
   };
 
   const pickedUp = () => {
+    if (offer?.id) {
+      Orders.setStatus(offer.id, "delivering").catch(console.error);
+    }
     setState("delivering");
   };
 
   const confirmDelivery = () => {
-    // Ajouter la course à l'historique
-    const completed = {
-      ...offer,
-      status: "delivered",
-      date: new Date().toISOString(),
-    };
-    setHistory(prev => [completed, ...prev]);
+    if (offer?.id) {
+      Orders.setStatus(offer.id, "delivered")
+        .then(() => {
+          // Ajouter la course à l'historique
+          setHistory(prev => [
+            { ...offer, status: "delivered", date: new Date().toISOString() },
+            ...prev,
+          ]);
+          refetchPending();
+          refetchMine();
+        })
+        .catch(console.error);
+    }
     // Réinitialiser
     setState("idle");
-    setOffer(NEW_OFFER);
+    setOffer(null);
   };
 
   return (

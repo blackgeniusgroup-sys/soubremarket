@@ -12,6 +12,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useOrders } from "../../hooks/useOrders";
 import { useProducts } from "../../hooks/useProducts";
 import { LineChart } from "../../components/admin/Charts";
+import VendorMessaging from "../../components/vendor/VendorMessaging";
 import { Orders, Products, Vendor } from "../../api/client";
 
 /* ═══════════════════════════════════════════════════════════
@@ -1353,7 +1354,7 @@ export default function SellerSpace() {
             {activeTab === "clients" && (
               <ClientsModule dark={dark} showToast={showToast} />
             )}
-            {activeTab === "support" && <SupportModule dark={dark} />}
+            {activeTab === "support" && <VendorMessaging dark={dark} />}
             {activeTab === "customizer" && <CustomizerModule products={products} dark={dark} showToast={showToast} />}
           </main>
         </div>

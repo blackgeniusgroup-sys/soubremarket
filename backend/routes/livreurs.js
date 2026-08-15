@@ -11,8 +11,8 @@ function sanitizeString(value, maxLength) {
   return value.trim().slice(0, maxLength);
 }
 
-// GET /api/livreurs — liste des livreurs (admin)
-router.get("/", requireAuth, requireRole("admin"), async (req, res) => {
+// GET /api/livreurs — liste des livreurs (admin et superadmin)
+router.get("/", requireAuth, requireRole("admin", "superadmin"), async (req, res) => {
   const { status } = req.query;
   if (status && !VALID_STATUSES.includes(status)) {
     return res.status(400).json({ error: "Statut invalide" });
@@ -82,9 +82,9 @@ router.post("/register", requireAuth, requireRole("livreur"), async (req, res) =
   }
 
   try {
-    // Vérifier si un profil livreur existe déjà
+    // Vérifier si un profil livreur existe déjà (la table livreurs utilise user_id comme clé primaire)
     const { data: existing } = await supa
-      .from("livreurs").select("id, status").eq("user_id", req.user.id).maybeSingle();
+      .from("livreurs").select("user_id, status").eq("user_id", req.user.id).maybeSingle();
 
     if (existing) {
       if (existing.status === "pending") {
@@ -116,7 +116,7 @@ router.post("/register", requireAuth, requireRole("livreur"), async (req, res) =
           type: "livreur",
           title: "Demande d'inscription livreur",
           message: `${sanitizeString(req.profile.name, 100)} a soumis une demande pour devenir livreur.`,
-          data: { livreur_id: data.id }
+          data: { livreur_id: data.user_id }
         }))
       );
     }
@@ -127,8 +127,8 @@ router.post("/register", requireAuth, requireRole("livreur"), async (req, res) =
   }
 });
 
-// PATCH /api/livreurs/:id/status — admin approuve/refuse
-router.patch("/:id/status", requireAuth, requireRole("admin"), async (req, res) => {
+// PATCH /api/livreurs/:id/status — admin approuve/refuse (l'ID est un user_id UUID)
+router.patch("/:id/status", requireAuth, requireRole("admin", "superadmin"), async (req, res) => {
   const livreurId = req.params.id;
   if (!UUID_REGEX.test(livreurId || "")) {
     return res.status(400).json({ error: "ID livreur invalide" });
@@ -143,7 +143,7 @@ router.patch("/:id/status", requireAuth, requireRole("admin"), async (req, res) 
   try {
     const { data, error } = await supa.from("livreurs")
       .update({ status, admin_note: cleanAdminNote })
-      .eq("id", livreurId)
+      .eq("user_id", livreurId)
       .select()
       .single();
     if (error) {
@@ -164,7 +164,7 @@ router.patch("/:id/status", requireAuth, requireRole("admin"), async (req, res) 
       title: status === "approved" ? "Inscription approuvée ✅" : status === "rejected" ? "Demande refusée" : "Compte suspendu",
       message: msgs[status],
       type: status === "approved" ? "success" : "system",
-      data: { livreur_id: data.id }
+      data: { livreur_id: data.user_id }
     });
 
     res.json({ message: "Statut mis à jour", livreur: data });

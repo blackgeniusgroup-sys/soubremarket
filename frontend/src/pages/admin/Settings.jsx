@@ -65,8 +65,8 @@ export default function AdminSettings() {
       Admin.themes().catch(()=>({theme:"dark"})),
     ]).then(([s,z,c,t])=>{
       if(Array.isArray(s)) setSettings(s);
-      if(z?.zones?.length) setZones(z.zones);
-      if(c?.categories?.length) setCategories(c.categories);
+      setZones(z?.zones || []);
+      setCategories(c?.categories || []);
       if(t?.theme) setTheme(t.theme);
     }).catch(()=>{});
   };

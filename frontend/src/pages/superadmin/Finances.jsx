@@ -1,7 +1,9 @@
 /**
  * Finances — Page de suivi financier et commissions pour le superadmin.
+ * Toutes les données proviennent de la base de données via l'API.
+ * Aucune donnée mockée.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Admin, Orders as OrdersAPI } from "../../api/client";
 import KpiCard from "../../components/admin/KpiCard";
 import StatusBadge from "../../components/admin/StatusBadge";
@@ -12,19 +14,59 @@ const fmtDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR") : "—";
 export default function Finances() {
   const [stats, setStats] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setError(null);
     Promise.all([
       Admin.stats(),
-      OrdersAPI.list({ limit: 20 }),
+      OrdersAPI.list({ limit: 50 }),
     ])
-      .then(([s, o]) => { setStats(s); setOrders(o.orders || []); })
-      .catch(console.error);
+      .then(([s, o]) => {
+        if (!mounted) return;
+        setStats(s);
+        setOrders(o.orders || []);
+      })
+      .catch(err => {
+        if (!mounted) return;
+        setError(err.message || "Erreur lors du chargement des données financières");
+      })
+      .finally(() => mounted && setLoading(false));
+    return () => { mounted = false; };
   }, []);
 
-  const delivered = orders.filter(o => o.status === "delivered");
-  const totalCommission = delivered.reduce((s, o) => s + (o.commission || 0), 0);
-  const totalRevenue = delivered.reduce((s, o) => s + (o.total || 0), 0);
+  const delivered = useMemo(() => orders.filter(o => o.status === "delivered"), [orders]);
+
+  // GMV et commission provenant de la somme serveur (stats) — source unique de vérité
+  const totalCommission = stats?.total_commission || 0;
+  const totalGmv = stats?.total_gmv || 0;
+  const deliveredCount = delivered.length;
+  const avgCommission = deliveredCount > 0 ? totalCommission / deliveredCount : 0;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-4xl mb-3">💰</div>
+          <p className="text-sm text-gray-400">Chargement des données financières...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-4xl mb-3">⚠️</div>
+          <p className="text-sm text-red-400">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -37,24 +79,22 @@ export default function Finances() {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiCard
           label="Revenus plateforme"
-          value={fmtFCFA(stats?.total_commission || totalCommission)}
+          value={fmtFCFA(totalCommission)}
           icon="💰"
-          trend={{ value: 8.2, positive: true }}
         />
         <KpiCard
           label="Volume d'affaires (GMV)"
-          value={fmtFCFA(totalRevenue || stats?.total_orders * 5000)}
+          value={fmtFCFA(totalGmv)}
           icon="💹"
-          trend={{ value: 12.5, positive: true }}
         />
         <KpiCard
           label="Commandes livrées"
-          value={delivered.length}
+          value={deliveredCount}
           icon="✅"
         />
         <KpiCard
           label="Commission moyenne"
-          value={delivered.length ? fmtFCFA(Math.round(totalCommission / delivered.length)) : "—"}
+          value={deliveredCount ? fmtFCFA(Math.round(avgCommission)) : "—"}
           icon="📊"
         />
       </div>

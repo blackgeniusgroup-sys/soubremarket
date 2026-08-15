@@ -18,7 +18,18 @@ export default function AdminLivreurs() {
   const loadLivreurs = useCallback(() => {
     LivreursAPI.list({ status: filter }).then(d=>setLivreurs(d.livreurs||[])).catch(console.error);
   }, [filter]);
-  useEffect(() => { loadLivreurs(); }, [loadLivreurs]);
+  useEffect(() => {
+    // Chargement initial
+    loadLivreurs();
+
+    // Actualisation automatique toutes les 30 secondes (30000 ms)
+    const interval = setInterval(() => {
+      loadLivreurs();
+    }, 30000);
+
+    // Nettoyage de l'intervalle au démontage du composant (prévient les fuites mémoire)
+    return () => clearInterval(interval);
+  }, [loadLivreurs]);
 
   const handle = async (id, status) => {
     try {
@@ -49,8 +60,9 @@ export default function AdminLivreurs() {
       {livreurs.map(l => {
         const st = STATUS_STYLE[l.status] || STATUS_STYLE.pending;
         const adminNote = l.adminNote || l.admin_note;
+        const livreurKey = l.user_id || l.userId;
         return (
-          <div key={l.userId || l.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
+          <div key={livreurKey} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-3xl border-2 border-gray-200 overflow-hidden shrink-0">
                 {(l.photoUrl || l.photo_url) ? <img src={l.photoUrl || l.photo_url} alt="" className="w-full h-full object-cover" /> : "🧑"}
@@ -103,22 +115,22 @@ export default function AdminLivreurs() {
 
             <div className="mb-3">
               <label className="block text-xs text-gray-500 mb-1">Note admin (optionnelle)</label>
-              <input type="text" placeholder="Ex: Documents vérifiés..." value={note[l.userId || l.id]||""}
-                onChange={e=>setNote(n=>({...n,[l.userId || l.id]:e.target.value}))}
+              <input type="text" placeholder="Ex: Documents vérifiés..." value={note[livreurKey]||""}
+                onChange={e=>setNote(n=>({...n,[livreurKey]:e.target.value}))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
             </div>
 
             <div className="flex gap-2 flex-wrap">
               {l.status!=="approved"&&(
-                <button onClick={()=>handle(l.userId || l.id,"approved")}
+                <button onClick={()=>handle(livreurKey,"approved")}
                   className="flex-1 bg-emerald-600 text-white text-sm font-semibold py-2 rounded-xl hover:bg-emerald-700">✅ Approuver</button>
               )}
               {l.status!=="rejected"&&(
-                <button onClick={()=>handle(l.userId || l.id,"rejected")}
+                <button onClick={()=>handle(livreurKey,"rejected")}
                   className="flex-1 bg-red-50 text-red-600 border border-red-200 text-sm font-semibold py-2 rounded-xl hover:bg-red-100">❌ Refuser</button>
               )}
               {l.status==="approved"&&(
-                <button onClick={()=>handle(l.userId || l.id,"suspended")}
+                <button onClick={()=>handle(livreurKey,"suspended")}
                   className="flex-1 bg-gray-100 text-gray-600 border border-gray-200 text-sm font-semibold py-2 rounded-xl hover:bg-gray-200">⏸ Suspendre</button>
               )}
               <a href={`https://wa.me/${l.phone}`} target="_blank" rel="noreferrer"

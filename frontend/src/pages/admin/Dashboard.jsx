@@ -73,6 +73,11 @@ export default function AdminDashboard({ initialTab = "overview" }) {
   const { profile } = useAuth();
   const isSuperAdmin = profile?.type === "superadmin";
   const [tab, setTab] = useState(initialTab);
+
+  // Synchroniser l'onglet actif quand la route change (navigation sidebar)
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
   const [stats, setStats] = useState(null);
   const [orders, setOrders] = useState([]);
   const [vendors, setVendors] = useState([]);
@@ -84,6 +89,8 @@ export default function AdminDashboard({ initialTab = "overview" }) {
   const [admins, setAdmins] = useState([]);
   const [theme, setTheme] = useState("dark");
   const [toast, setToast] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Modals
   const [productModal, setProductModal] = useState(null);
@@ -106,19 +113,30 @@ export default function AdminDashboard({ initialTab = "overview" }) {
       Admin.themes().catch(()=>({theme:"dark"})),
     ]).then(([s,o,v,cl,p,l,z,c,a,t])=>{
       if(s && Object.keys(s).length) setStats(s);
-      if(o?.orders?.length) setOrders(o.orders);
-      if(v?.users?.length) setVendors(v.users);
-      if(cl?.users?.length) setClients(cl.users);
-      if(p?.products?.length) setProducts(p.products);
-      if(l?.livreurs?.length) setLivreurs(l.livreurs);
-      if(z?.zones?.length) setZones(z.zones);
-      if(c?.categories?.length) setCategories(c.categories);
-      if(a?.admins?.length) setAdmins(a.admins);
+      setOrders(o?.orders || []);
+      setVendors(v?.users || []);
+      setClients(cl?.users || []);
+      setProducts(p?.products || []);
+      setLivreurs(l?.livreurs || []);
+      setZones(z?.zones || []);
+      setCategories(c?.categories || []);
+      setAdmins(a?.admins || []);
       if(t?.theme) setTheme(t.theme);
     }).catch(()=>{});
   };
 
-  useEffect(()=>{ loadAll(); }, []);
+  useEffect(()=>{
+    // Chargement initial
+    loadAll();
+
+    // Actualisation automatique toutes les 5 secondes (5000 ms)
+    const interval = setInterval(() => {
+      loadAll();
+    }, 5000);
+
+    // Nettoyage de l'intervalle au démontage du composant (prévient les fuites mémoire)
+    return () => clearInterval(interval);
+  }, []);
 
   const showToast = (msg, type="success") => {
     setToast({ message: msg, type });
@@ -282,7 +300,7 @@ export default function AdminDashboard({ initialTab = "overview" }) {
 
   /* ─── DÉRIVÉS ─── */
   const pendingVendors = vendors.filter(v=>!v.active);
-  const gmv = (stats?.total_orders||0)*5000;
+  const gmv = stats?.total_gmv || 0;
   const tc = stats?.total_commission||0;
   const tv = stats?.total_vendors||0;
   const to = stats?.total_orders||0;

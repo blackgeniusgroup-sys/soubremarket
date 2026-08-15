@@ -69,6 +69,7 @@ app.use("/api/livreurs", require("./routes/livreurs"));
 app.use("/api/admin",    require("./routes/admin"));
 app.use("/api/payments", require("./routes/payments"));
 app.use("/api/vendor",   require("./routes/vendor"));
+app.use("/api/messages", require("./routes/messages")); // ← AJOUT : Messagerie interne vendeurs ↔ admins
 
 // GET /api/zones — public
 const supa = require("./services/supabase");
@@ -111,5 +112,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: message });
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`✅ SoubreMarket API → http://localhost:${PORT}`));
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURATION RENDER — PORT dynamique + hôte 0.0.0.0
+//  Render injecte process.env.PORT automatiquement.
+//  L'hôte 0.0.0.0 est OBLIGATOIRE pour que Render puisse
+//  router les requêtes vers le process Node.js.
+// ═══════════════════════════════════════════════════════════
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, "0.0.0.0", () => console.log(`✅ SoubreMarket API → http://0.0.0.0:${PORT}`));

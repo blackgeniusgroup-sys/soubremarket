@@ -2,6 +2,7 @@ const express = require("express");
 const router  = express.Router();
 const supa    = require("../services/supabase");
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { getKpis } = require("../services/kpiService");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -13,69 +14,17 @@ function sanitizeString(value, maxLength) {
 // Toutes les routes admin nécessitent le rôle admin ou superadmin
 router.use(requireAuth, requireRole("admin", "superadmin"));
 
-// GET /api/admin/stats
+// GET /api/admin/stats — KPIs ROBUSTES avec fallbacks (ne renvoie JAMAIS d'erreur)
 router.get("/stats", async (req, res) => {
   try {
-    // Comptage via les métadonnées de Supabase (head:true → aucun tuple renvoyé, seul le count est calculé)
-    const countAll = async (table) => {
-      const { count, error } = await supa.from(table).select("*", { count: "exact", head: true });
-      if (error) throw error;
-      return count || 0;
-    };
-    const countWhere = async (table, column, value) => {
-      const { count, error } = await supa
-        .from(table)
-        .select("*", { count: "exact", head: true })
-        .eq(column, value);
-      if (error) throw error;
-      return count || 0;
-    };
-
-    const [
-      total_clients,
-      total_vendors,
-      total_livreurs,
-      pending_livreurs,
-      total_orders,
-      active_deliveries,
-      pending_comments,
-      total_products,
-    ] = await Promise.all([
-      countAll("clients"),
-      countAll("vendors"),
-      countWhere("livreurs", "status", "approved"),
-      countWhere("livreurs", "status", "pending"),
-      countAll("orders"),
-      countWhere("orders", "status", "delivering"),
-      countWhere("comments", "approved", false),
-      countWhere("products", "active", true),
-    ]);
-
-    // Commission totale des commandes livrées (somme côté serveur)
-    let total_commission = 0;
-    const { data: deliveredOrders, error: commissionError } = await supa
-      .from("orders")
-      .select("commission")
-      .eq("status", "delivered");
-    if (commissionError) throw commissionError;
-    for (const order of deliveredOrders || []) {
-      total_commission += order.commission || 0;
-    }
-
-    res.json({
-      total_clients,
-      total_vendors,
-      total_livreurs,
-      pending_livreurs,
-      total_orders,
-      active_deliveries,
-      total_commission,
-      pending_comments,
-      total_products,
-    });
+    const stats = await getKpis();
+    // Toujours retourner 200 avec les fallbacks — le frontend s'affiche toujours
+    return res.json(stats);
   } catch (err) {
-    console.error("Erreur stats admin:", err);
-    res.status(500).json({ error: "Erreur lors du chargement des statistiques" });
+    console.error("ERREUR KPIs (fallback appliqué) :", err.message);
+    // Même en cas d'erreur, on renvoie les valeurs de secours (0 / [])
+    const { FALLBACK_STATS } = require("../services/kpiService");
+    return res.json(FALLBACK_STATS);
   }
 });
 
@@ -249,7 +198,8 @@ router.get("/users", async (req, res) => {
       data = data.concat(vendors || []);
     }
     if (!type || type === "livreur") {
-      const { data: livreurs, error } = await supa.from("livreurs").select("user_id, name, phone, status, active, created_at");
+      // SELECT * pour récupérer TOUS les livreurs (tous les statuts : pending, approved, active, deleted, etc.)
+      const { data: livreurs, error } = await supa.from("livreurs").select("*");
       if (error) throw error;
       data = data.concat(livreurs || []);
     }
@@ -354,8 +304,8 @@ router.post("/zones", async (req, res) => {
     if (error) throw error;
     res.status(201).json(data);
   } catch (err) {
-    console.error("Erreur création zone:", err);
-    res.status(500).json({ error: "Erreur lors de la création de la zone" });
+    console.error("ERREUR CRUCIALE BASE DE DONNÉES :", err);
+    res.status(500).json({ success: false, error: err.message || err });
   }
 });
 
@@ -709,6 +659,102 @@ router.delete("/map-lieux/:id", async (req, res) => {
   } catch (err) {
     console.error("Erreur suppression lieu:", err);
     res.status(500).json({ error: "Erreur lors de la suppression du lieu" });
+  }
+});
+
+// GET /api/admin/drivers — Liste complète des livreurs avec positions GPS pour la carte en direct
+router.get("/drivers", async (req, res) => {
+  try {
+    // Récupère TOUS les livreurs sans exclure les statuts (pending, approved, active, deleted, rejected...)
+    const { data, error } = await supa
+      .from("livreurs")
+      .select("user_id, name, phone, status, active, is_online, vehicule, photo_url, current_lat, current_lng, zone_travail, created_at");
+    if (error) throw error;
+    res.json({ drivers: data || [] });
+  } catch (err) {
+    console.error("Erreur drivers:", err);
+    res.status(500).json({ error: "Erreur lors du chargement des livreurs" });
+  }
+});
+
+// GET /api/admin/notifications — Notifications réelles de l'admin connecté
+router.get("/notifications", async (req, res) => {
+  try {
+    const { data, error } = await supa
+      .from("notifications")
+      .select("*")
+      .eq("user_id", req.user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw error;
+
+    const unreadCount = (data || []).filter(n => !n.read).length;
+    res.json({ notifications: data || [], unreadCount });
+  } catch (err) {
+    console.error("Erreur notifications:", err);
+    res.status(500).json({ error: "Erreur lors du chargement des notifications" });
+  }
+});
+
+// GET /api/admin/finances/monthly — Évolution mensuelle des commissions (12 derniers mois)
+router.get("/finances/monthly", async (req, res) => {
+  try {
+    const { data, error } = await supa
+      .from("orders")
+      .select("commission, created_at")
+      .eq("status", "delivered");
+    if (error) throw error;
+
+    const months = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      months.push({
+        key,
+        label: d.toLocaleDateString("fr-FR", { month: "short" }) + " " + String(d.getFullYear()).slice(2),
+        value: 0,
+      });
+    }
+    const map = {};
+    months.forEach(m => { map[m.key] = m; });
+
+    for (const order of data || []) {
+      if (!order.created_at) continue;
+      const d = new Date(order.created_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (map[key]) map[key].value += order.commission || 0;
+    }
+
+    res.json({ monthly: months });
+  } catch (err) {
+    console.error("Erreur finances monthly:", err);
+    res.status(500).json({ error: "Erreur lors du chargement des données financières" });
+  }
+});
+
+// GET /api/admin/vendor-categories — Répartition des produits par catégorie
+router.get("/vendor-categories", async (req, res) => {
+  try {
+    const { data, error } = await supa
+      .from("products")
+      .select("category")
+      .eq("active", true);
+    if (error) throw error;
+
+    const countByCat = {};
+    for (const p of data || []) {
+      const cat = p.category || "Autres";
+      countByCat[cat] = (countByCat[cat] || 0) + 1;
+    }
+    // Trier par nombre de produits décroissant
+    const categories = Object.entries(countByCat)
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+    res.json({ categories });
+  } catch (err) {
+    console.error("Erreur vendor-categories:", err);
+    res.status(500).json({ error: "Erreur lors du chargement des catégories de produits" });
   }
 });
 

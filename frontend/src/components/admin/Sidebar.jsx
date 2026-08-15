@@ -17,6 +17,7 @@ const SUPERADMIN_ITEMS = [
   { to: "/superadmin/commandes", label: "Commandes & Transactions", icon: "🧾", sub: "Suivi multi-vendeurs" },
   { to: "/superadmin/finances", label: "Finances & Payouts", icon: "💰", sub: "Commissions, Stripe Connect" },
   { to: "/superadmin/moderation", label: "Modération", icon: "🛡️", sub: "Commentaires, litiges" },
+  { to: "/superadmin/messages", label: "Messagerie", icon: "💬", sub: "Conversations avec vendeurs" },
   { to: "/superadmin/settings", label: "Configuration Globale", icon: "⚙️", sub: "Zones, catégories, thèmes, frais" },
 ];
 
@@ -28,6 +29,7 @@ const ADMIN_ITEMS = [
   { to: "/admin/livreurs", label: "Gestion des Livreurs", icon: "🛵", sub: "Validation, statuts" },
   { to: "/admin/produits", label: "Gestion des Produits", icon: "📦", sub: "Catalogue, stock" },
   { to: "/admin/litiges", label: "Gestion des Litiges", icon: "⚖️", sub: "Remboursements, conflits" },
+  { to: "/admin/messages", label: "Messagerie", icon: "💬", sub: "Conversations avec vendeurs" },
   { to: "/admin/settings", label: "Configuration", icon: "⚙️", sub: "Paramètres système" },
 ];
 

@@ -55,7 +55,20 @@ class ApiClient {
           this.removeTokens();
           window.dispatchEvent(new Event("auth:logout"));
         }
-        throw new Error(typeof data === "string" ? data : (data.error || `Erreur ${res.status}`));
+        // HTTP 429 — Trop de requêtes : ne pas faire crasher l'interface
+        if (res.status === 429) {
+          // Notifie l'UI sans lever d'exception fatale (le polling continue avec les dernières données)
+          window.dispatchEvent(new CustomEvent("api:rate-limited", {
+            detail: { endpoint, message: typeof data === "string" ? data : (data.error || "Trop de requêtes, veuillez patienter.") }
+          }));
+          // Retourne null pour les lectures (GET) → les fallbacks côté composants s'appliquent
+          if (options.method === "GET" || options.method === undefined) {
+            return null;
+          }
+          // Pour les écritures, on remonte l'erreur pour afficher le message
+          throw new Error(typeof data === "string" ? data : (data.error || "Trop de requêtes, réessayez dans quelques minutes."));
+        }
+        throw new Error(typeof data === "string" ? data : (data.error || data.message || `Erreur ${res.status}`));
       }
 
       return data;
@@ -116,6 +129,10 @@ export const Livreurs = {
 
 export const Admin = {
   stats:         ()          => api.get("/admin/stats"),
+  drivers:       ()          => api.get("/admin/drivers"),
+  notifications: ()          => api.get("/admin/notifications"),
+  financesMonthly:()         => api.get("/admin/finances/monthly"),
+  vendorCategories:()         => api.get("/admin/vendor-categories"),
   settings:      ()          => api.get("/admin/settings"),
   saveSettings:  (updates)   => api.patch("/admin/settings", { updates }),
   comments:      (approved)  => api.get("/admin/comments", { approved }),
@@ -149,6 +166,14 @@ export const Admin = {
 
 export const Payments = {
   initiate: (order_id) => api.post("/payments/initiate", { order_id }),
+};
+
+export const Messages = {
+  conversations: ()    => api.get("/messages/conversations"),
+  get:           (id)  => api.get(`/messages/${id}`),
+  send:          (id, content) => api.post(`/messages/${id}/send`, { content }),
+  start:         (subject, firstMessage) => api.post("/messages/start", { subject, firstMessage }),
+  markRead:      (id)  => api.patch(`/messages/${id}/read`),
 };
 
 export const Vendor = {

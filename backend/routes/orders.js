@@ -292,8 +292,8 @@ router.get("/:id", requireAuth, async (req, res) => {
   }
 });
 
-// PATCH /api/orders/:id/status — livreur met à jour le statut
-router.patch("/:id/status", requireAuth, requireRole("livreur","admin"), async (req, res) => {
+// PATCH /api/orders/:id/status — livreur ou admin met à jour le statut
+router.patch("/:id/status", requireAuth, requireRole("livreur","admin","superadmin"), async (req, res) => {
   const orderId = req.params.id;
   if (!UUID_REGEX.test(orderId || "")) {
     return res.status(400).json({ error: "ID de commande invalide" });
@@ -354,8 +354,8 @@ router.patch("/:id/status", requireAuth, requireRole("livreur","admin"), async (
   }
 });
 
-// PATCH /api/orders/:id/assign — admin assigne un livreur
-router.patch("/:id/assign", requireAuth, requireRole("admin"), async (req, res) => {
+// PATCH /api/orders/:id/assign — admin/superadmin assigne un livreur
+router.patch("/:id/assign", requireAuth, requireRole("admin","superadmin"), async (req, res) => {
   const orderId = req.params.id;
   if (!UUID_REGEX.test(orderId || "")) {
     return res.status(400).json({ error: "ID de commande invalide" });

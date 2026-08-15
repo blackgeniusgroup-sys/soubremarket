@@ -27,6 +27,7 @@ const EnCours       = lazy(() => import('./pages/livreur/EnCours'));
 const AdminDash     = lazy(() => import('./pages/admin/Dashboard'));
 const AdminLivreurs = lazy(() => import('./pages/admin/Livreurs'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
+const AdminMessaging = lazy(() => import('./components/admin/AdminMessaging'));
 
 // Superadmin
 const SuperAdminLayout = lazy(() => import('./components/admin/SuperAdminLayout'));
@@ -93,6 +94,7 @@ export default function App() {
             <Route path="produits" element={<AdminDash initialTab="products" />} />
             <Route path="litiges" element={<AdminDash initialTab="orders" />} />
             <Route path="admins" element={<AdminDash initialTab="admins" />} />
+            <Route path="messages" element={<AdminMessaging />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
 
@@ -107,6 +109,7 @@ export default function App() {
             <Route path="commandes" element={<SuperCommandes />} />
             <Route path="finances" element={<SuperFinances />} />
             <Route path="moderation" element={<SuperModeration />} />
+            <Route path="messages" element={<AdminMessaging />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
 
