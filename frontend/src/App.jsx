@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import Toast from './components/Toast';
+import RateLimitNotice from './components/RateLimitNotice';
 
 // Lazy loading des pages
 const Landing       = lazy(() => import('./pages/Landing'));
@@ -63,6 +64,7 @@ function PrivateRoute({ children, roles }) {
 export default function App() {
   return (
     <Toast>
+      <RateLimitNotice />
       <BrowserRouter>
         <Suspense fallback={<PageLoader />}>
           <Routes>

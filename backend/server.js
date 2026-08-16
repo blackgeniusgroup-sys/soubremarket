@@ -6,6 +6,9 @@ const app       = express();
 app.set("trust proxy", 1); // Pour Heroku et autres proxys
 
 const { apiLimiter } = require("./middleware/rateLimit");
+const normalizeResponse = require("./middleware/normalizeResponse"); // ← AJOUT : normalise camelCase → snake_case
+const zonesSecureRouter = require("./routes/zonesSecure"); // ← SÉCURISÉ : zones via JWT + RLS
+const notificationsSecureRouter = require("./routes/notificationsSecure"); // ← SÉCURISÉ : notifications via Prisma
 
 // Liste blanche des origines autorisées
 const ALLOWED_ORIGINS = [
@@ -53,6 +56,10 @@ app.use(helmet({
 app.use(express.json({ limit: "10mb" })); // Limite la taille du corps à 10 Mo (pour les uploads d'images base64)
 app.use("/api/", apiLimiter);
 
+// Normalise les réponses Prisma (camelCase) → snake_case pour le frontend
+// ⚠️ DOIT ÊTRE AVANT les routes pour intercepter res.json()
+app.use(normalizeResponse);
+
 app.use((req, res, next) => {
   // On nettoie les doubles slashs n'importe où dans l'URL (sauf après le http:)
   if (req.url.includes('//')) {
@@ -68,8 +75,10 @@ app.use("/api/orders",   require("./routes/orders"));
 app.use("/api/livreurs", require("./routes/livreurs"));
 app.use("/api/admin",    require("./routes/admin"));
 app.use("/api/payments", require("./routes/payments"));
-app.use("/api/vendor",   require("./routes/vendor"));
-app.use("/api/messages", require("./routes/messages")); // ← AJOUT : Messagerie interne vendeurs ↔ admins
+app.use("/api/vendor",     require("./routes/vendor"));
+app.use("/api/messages",   require("./routes/messages")); // ← AJOUT : Messagerie interne vendeurs ↔ admins
+app.use("/api/zones-secure", zonesSecureRouter); // ← SÉCURISÉ : CRUD zones via JWT utilisateur + RLS
+app.use("/api/notifications-secure", notificationsSecureRouter); // ← SÉCURISÉ : notifications via Prisma (badges réels)
 
 // GET /api/zones — public
 const supa = require("./services/supabase");

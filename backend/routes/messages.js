@@ -60,16 +60,16 @@ router.get("/conversations", async (req, res) => {
         },
       });
 
-      // Enrichir avec les noms des vendeurs via Supabase
+      // Enrichir avec les noms des vendeurs via Prisma (vraie table "vendors")
       const vendorIds = [...new Set(conversations.map(c => c.vendorId))];
       let vendorMap = {};
       if (vendorIds.length > 0) {
-        const { data: vendors } = await supa
-          .from("vendors")
-          .select("user_id, name, shop_name, phone")
-          .in("user_id", vendorIds);
+        const vendors = await prisma.vendor.findMany({
+          where: { userId: { in: vendorIds } },
+          select: { userId: true, name: true, shopName: true, phone: true },
+        });
         vendorMap = (vendors || []).reduce((acc, v) => {
-          acc[v.user_id] = v;
+          acc[v.userId] = v;
           return acc;
         }, {});
       }
@@ -104,18 +104,18 @@ router.get("/conversations", async (req, res) => {
         },
       });
 
-      // Enrichir avec les infos admins via Supabase
+      // Enrichir avec les infos admins via Prisma (vraies tables "admins" + "superadmins")
       const adminIds = [...new Set(conversations.map(c => c.adminId))];
       let adminMap = {};
       if (adminIds.length > 0) {
-        const { data: admins } = await supa
-          .from("admins")
-          .select("user_id, name, phone")
-          .in("user_id", adminIds);
-        const { data: superadmins } = await supa
-          .from("superadmins")
-          .select("user_id, name, phone")
-          .in("user_id", adminIds);
+        const admins = await prisma.admins.findMany({
+          where: { user_id: { in: adminIds } },
+          select: { user_id: true, name: true, phone: true },
+        });
+        const superadmins = await prisma.superadmins.findMany({
+          where: { user_id: { in: adminIds } },
+          select: { user_id: true, name: true, phone: true },
+        });
         adminMap = [...(admins || []), ...(superadmins || [])].reduce((acc, a) => {
           acc[a.user_id] = a;
           return acc;
@@ -146,6 +146,74 @@ router.get("/conversations", async (req, res) => {
   } catch (err) {
     console.error("Erreur liste conversations:", err);
     res.status(500).json({ error: "Erreur lors du chargement des conversations" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   GET /api/messages/contacts
+   Liste des contacts disponibles pour la messagerie selon le rôle :
+   - Vendeur  → UNIQUEMENT les Administrateurs (jamais d'autres vendeurs)
+   - Admin    → TOUS les Vendeurs inscrits sur la plateforme
+   ═══════════════════════════════════════════════════════════ */
+router.get("/contacts", async (req, res) => {
+  try {
+    if (req.profile.type === "vendor") {
+      // Vendeur : voir UNIQUEMENT les admins actifs via Prisma (vraie table "admins")
+      const admins = await prisma.admins.findMany({
+        where: { active: true },
+        orderBy: { name: "asc" },
+        select: { user_id: true, name: true, phone: true, active: true },
+      });
+
+      // + les superadmins actifs
+      const superadmins = await prisma.superadmins.findMany({
+        where: { active: true },
+        orderBy: { name: "asc" },
+        select: { user_id: true, name: true, phone: true, active: true },
+      });
+
+      const contacts = [
+        ...(admins || []).map(a => ({ ...a, role: "admin" })),
+        ...(superadmins || []).map(s => ({ ...s, role: "superadmin" })),
+      ];
+
+      return res.json({ contacts });
+    }
+
+    if (req.profile.type === "admin" || req.profile.type === "superadmin") {
+      // Admin : voir TOUS les vendeurs inscrits via Prisma (vraie table "vendors")
+      const vendors = await prisma.vendor.findMany({
+        orderBy: { name: "asc" },
+        select: {
+          userId: true,
+          name: true,
+          phone: true,
+          shopName: true,
+          whatsapp: true,
+          address: true,
+          active: true,
+          createdAt: true,
+        },
+      });
+
+      const contacts = (vendors || []).map(v => ({
+        user_id: v.userId,
+        name: v.name,
+        phone: v.phone,
+        shop_name: v.shopName,
+        whatsapp: v.whatsapp,
+        address: v.address,
+        active: v.active,
+        created_at: v.createdAt,
+        role: "vendor",
+      }));
+      return res.json({ contacts });
+    }
+
+    return res.status(403).json({ error: "Accès refusé — seuls les vendeurs et admins peuvent utiliser la messagerie" });
+  } catch (err) {
+    console.error("Erreur liste contacts:", err);
+    res.status(500).json({ error: "Erreur lors du chargement des contacts" });
   }
 });
 
@@ -265,24 +333,22 @@ router.post("/start", async (req, res) => {
   }
 
   try {
-    // Trouver un admin disponible (premier admin actif)
-    const { data: adminProfile, error: adminError } = await supa
-      .from("admins")
-      .select("user_id")
-      .eq("active", true)
-      .limit(1)
-      .maybeSingle();
+    // Trouver un admin disponible (premier admin actif) via Prisma (vraie table "admins")
+    const adminProfile = await prisma.admins.findFirst({
+      where: { active: true },
+      select: { user_id: true },
+      orderBy: { name: "asc" },
+    });
 
     let adminId = adminProfile?.user_id || null;
 
     // Si aucun admin, chercher dans superadmins
     if (!adminId) {
-      const { data: superAdminProfile } = await supa
-        .from("superadmins")
-        .select("user_id")
-        .eq("active", true)
-        .limit(1)
-        .maybeSingle();
+      const superAdminProfile = await prisma.superadmins.findFirst({
+        where: { active: true },
+        select: { user_id: true },
+        orderBy: { name: "asc" },
+      });
       adminId = superAdminProfile?.user_id || null;
     }
 

@@ -336,6 +336,32 @@ router.post("/logout", requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/auth/refresh — Rafraîchit le token d'accès via le refresh_token
+// Utilisé par l'intercepteur frontend (frontend/src/api/interceptor.js)
+// pour éviter les pages vides et les déconnexions intempestives.
+router.post("/refresh", async (req, res) => {
+  const { refresh_token } = req.body;
+  if (!refresh_token || typeof refresh_token !== "string" || refresh_token.length < 10) {
+    return res.status(400).json({ error: "refresh_token invalide" });
+  }
+
+  try {
+    const { data, error } = await supa.auth.refreshSession({ refresh_token });
+    if (error || !data?.session) {
+      return res.status(401).json({ error: "Session expirée ou refresh_token invalide" });
+    }
+
+    res.json({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      user: data.user,
+    });
+  } catch (err) {
+    console.error("Erreur refresh:", err);
+    res.status(500).json({ error: "Erreur lors du rafraîchissement de la session" });
+  }
+});
+
 // GET /api/auth/me
 router.get("/me", requireAuth, async (req, res) => {
   res.json({ user: req.user, profile: req.profile });

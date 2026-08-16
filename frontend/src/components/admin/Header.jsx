@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
-import { Admin } from "../../api/client";
+import { Admin, api } from "../../api/client";
 
 const PERIODS = [
   { key: "today", label: "Aujourd'hui" },
@@ -98,8 +98,11 @@ export default function Header({ onMenuClick, period, onPeriodChange }) {
   const currentPeriod = PERIODS.find(p => p.key === period) || PERIODS[0];
 
   const markAllRead = () => {
+    // Mise à jour optimiste de l'UI
     setNotifications(ns => ns.map(n => ({ ...n, read: true })));
     setUnreadCount(0);
+    // Persister via la route sécurisée (Prisma)
+    api.patch("/notifications-secure/read-all").catch(() => {});
   };
 
   return (

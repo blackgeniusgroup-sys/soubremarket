@@ -1,6 +1,7 @@
 const express = require("express");
 const router  = express.Router();
 const supa    = require("../services/supabase");
+const prisma  = require("../services/prisma");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { getKpis } = require("../services/kpiService");
 
@@ -174,7 +175,12 @@ router.patch("/products/:id/featured", async (req, res) => {
   }
 });
 
-// GET /api/admin/users
+// GET /api/admin/users?type=vendor|client|livreur|admin|superadmin
+// ═══════════════════════════════════════════════════════════
+//  CORRIGÉ : lit directement les VRAIES tables Prisma correspondantes
+//  (clients, vendors, livreurs, admins, superadmins) au lieu d'un
+//  modèle centralisé "users"/"profiles" inexistant.
+// ═══════════════════════════════════════════════════════════
 router.get("/users", async (req, res) => {
   const { type, active } = req.query;
   const validTypes = ["client", "vendor", "livreur", "admin", "superadmin"];
@@ -187,31 +193,102 @@ router.get("/users", async (req, res) => {
 
   try {
     let data = [];
+
+    // ─── CLIENTS ───
     if (!type || type === "client") {
-      const { data: clients, error } = await supa.from("clients").select("user_id, name, phone, address, active, created_at");
-      if (error) throw error;
-      data = data.concat(clients || []);
+      const clients = await prisma.client.findMany({
+        orderBy: { createdAt: "desc" },
+      });
+      data = data.concat(
+        clients.map(c => ({
+          user_id: c.userId,
+          name: c.name,
+          phone: c.phone,
+          address: c.address,
+          active: c.active,
+          created_at: c.createdAt,
+        }))
+      );
     }
+
+    // ─── VENDEURS ───
     if (!type || type === "vendor") {
-      const { data: vendors, error } = await supa.from("vendors").select("user_id, name, phone, shop_name, whatsapp, address, active, created_at");
-      if (error) throw error;
-      data = data.concat(vendors || []);
+      const vendors = await prisma.vendor.findMany({
+        orderBy: { createdAt: "desc" },
+      });
+      data = data.concat(
+        vendors.map(v => ({
+          user_id: v.userId,
+          name: v.name,
+          phone: v.phone,
+          shop_name: v.shopName,
+          whatsapp: v.whatsapp,
+          address: v.address,
+          active: v.active,
+          created_at: v.createdAt,
+        }))
+      );
     }
+
+    // ─── LIVREURS ───
     if (!type || type === "livreur") {
-      // SELECT * pour récupérer TOUS les livreurs (tous les statuts : pending, approved, active, deleted, etc.)
-      const { data: livreurs, error } = await supa.from("livreurs").select("*");
-      if (error) throw error;
-      data = data.concat(livreurs || []);
+      // Tous les livreurs (tous statuts : pending, approved, active, deleted...)
+      const livreurs = await prisma.livreur.findMany({
+        orderBy: { createdAt: "desc" },
+      });
+      data = data.concat(
+        livreurs.map(l => ({
+          user_id: l.userId,
+          name: l.name,
+          phone: l.phone,
+          status: l.status,
+          active: l.active,
+          vehicule: l.vehicule,
+          zone_travail: l.zoneTravail,
+          photo_url: l.photoUrl,
+          permis: l.permis,
+          permis_recto_url: l.permisRectoUrl,
+          permis_verso_url: l.permisVersoUrl,
+          cni_url: l.cniUrl,
+          current_lat: l.currentLat,
+          current_lng: l.currentLng,
+          is_online: l.isOnline,
+          admin_note: l.adminNote,
+          created_at: l.createdAt,
+        }))
+      );
     }
+
+    // ─── ADMINS ───
     if (!type || type === "admin") {
-      const { data: admins, error } = await supa.from("admins").select("user_id, name, phone, active, created_at");
-      if (error) throw error;
-      data = data.concat(admins || []);
+      const admins = await prisma.admins.findMany({
+        orderBy: { created_at: "desc" },
+      });
+      data = data.concat(
+        admins.map(a => ({
+          user_id: a.user_id,
+          name: a.name,
+          phone: a.phone,
+          active: a.active,
+          created_at: a.created_at,
+        }))
+      );
     }
+
+    // ─── SUPERADMINS ───
     if (!type || type === "superadmin") {
-      const { data: superadmins, error } = await supa.from("superadmins").select("user_id, name, phone, active, created_at");
-      if (error) throw error;
-      data = data.concat(superadmins || []);
+      const superadmins = await prisma.superadmins.findMany({
+        orderBy: { created_at: "desc" },
+      });
+      data = data.concat(
+        superadmins.map(s => ({
+          user_id: s.user_id,
+          name: s.name,
+          phone: s.phone,
+          active: s.active,
+          created_at: s.created_at,
+        }))
+      );
     }
 
     if (active !== undefined) {
@@ -243,22 +320,65 @@ router.patch("/users/:id", async (req, res) => {
 
   // Empêcher un admin non-superadmin de modifier un superadmin
   if (req.profile.type !== "superadmin") {
-    const { data: isSuperAdmin } = await supa.from("superadmins").select("user_id").eq("user_id", userId).maybeSingle();
+    const isSuperAdmin = await prisma.superadmins.findUnique({
+      where: { user_id: userId },
+      select: { user_id: true },
+    });
     if (isSuperAdmin) {
       return res.status(403).json({ error: "Seul le superadmin peut modifier un superadmin" });
     }
   }
 
   try {
-    const updatePayload = { active };
-    const targets = ["clients", "vendors", "livreurs", "admins", "superadmins"];
+    // ─── VRAIES TABLES PRISMA ───
+    // Recherche dans l'ordre : clients, vendors, livreurs, admins, superadmins
     let result = null;
 
-    for (const table of targets) {
-      const { data, error } = await supa.from(table).update(updatePayload).eq("user_id", userId).select().single();
-      if (!error && data) {
-        result = data;
-        break;
+    const client = await prisma.client.updateMany({
+      where: { userId },
+      data: { active },
+    }).catch(() => ({ count: 0 }));
+    if (client.count > 0) {
+      result = await prisma.client.findUnique({ where: { userId } });
+    }
+
+    if (!result) {
+      const vendor = await prisma.vendor.updateMany({
+        where: { userId },
+        data: { active },
+      }).catch(() => ({ count: 0 }));
+      if (vendor.count > 0) {
+        result = await prisma.vendor.findUnique({ where: { userId } });
+      }
+    }
+
+    if (!result) {
+      const livreur = await prisma.livreur.updateMany({
+        where: { userId },
+        data: { active },
+      }).catch(() => ({ count: 0 }));
+      if (livreur.count > 0) {
+        result = await prisma.livreur.findUnique({ where: { userId } });
+      }
+    }
+
+    if (!result) {
+      const admin = await prisma.admins.updateMany({
+        where: { user_id: userId },
+        data: { active },
+      }).catch(() => ({ count: 0 }));
+      if (admin.count > 0) {
+        result = await prisma.admins.findUnique({ where: { user_id: userId } });
+      }
+    }
+
+    if (!result) {
+      const superadmin = await prisma.superadmins.updateMany({
+        where: { user_id: userId },
+        data: { active },
+      }).catch(() => ({ count: 0 }));
+      if (superadmin.count > 0) {
+        result = await prisma.superadmins.findUnique({ where: { user_id: userId } });
       }
     }
 
@@ -427,11 +547,13 @@ router.delete("/categories/:id", async (req, res) => {
 });
 
 // ─── CRUD ADMINS ───
+// CORRIGÉ : lit la vraie table "admins" via Prisma
 router.get("/admins", async (req, res) => {
   try {
-    const { data, error } = await supa.from("admins").select("*").order("created_at", { ascending: false });
-    if (error) throw error;
-    res.json({ admins: data });
+    const admins = await prisma.admins.findMany({
+      orderBy: { created_at: "desc" },
+    });
+    res.json({ admins });
   } catch (err) {
     console.error("Erreur admins:", err);
     res.status(500).json({ error: "Erreur lors du chargement des admins" });

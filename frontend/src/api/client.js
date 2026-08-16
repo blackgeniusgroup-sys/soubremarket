@@ -1,83 +1,40 @@
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+/**
+ * ═══════════════════════════════════════════════════════════════
+ *  CLIENT API — SÉCURISÉ AVEC INTERCEPTEUR GLOBAL
+ * ═══════════════════════════════════════════════════════════════
+ *  Utilise l'intercepteur `apiFetch` qui :
+ *  1. Injecte automatiquement le Bearer Token Supabase
+ *  2. Rafraîchit automatiquement le token expiré
+ *  3. Rejoue la requête après refresh (aucune page vide)
+ *  4. Gère proprement les erreurs 429 (rate limit)
+ * ═══════════════════════════════════════════════════════════════
+ */
+import apiFetch, { tokenStore } from "./interceptor";
 
 class ApiClient {
   constructor() {
-    this.baseUrl = API_URL;
     this.tokenKey = "soubremarket_token";
     this.refreshKey = "soubremarket_refresh_token";
   }
 
   getToken() {
-    return localStorage.getItem(this.tokenKey);
+    return tokenStore.getToken();
   }
 
   getRefreshToken() {
-    return localStorage.getItem(this.refreshKey);
+    return tokenStore.getRefreshToken();
   }
 
   setTokens(accessToken, refreshToken) {
-    localStorage.setItem(this.tokenKey, accessToken);
-    if (refreshToken) {
-      localStorage.setItem(this.refreshKey, refreshToken);
-    }
+    tokenStore.setTokens(accessToken, refreshToken);
   }
 
   removeTokens() {
-    localStorage.removeItem(this.tokenKey);
-    localStorage.removeItem(this.refreshKey);
+    tokenStore.removeTokens();
   }
 
   async request(endpoint, options = {}) {
-    const token = this.getToken();
-    const config = {
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    try {
-      const res = await fetch(`${this.baseUrl}${endpoint}`, config);
-
-      // Gérer les réponses vides (204, etc.)
-      if (res.status === 204) {
-        return null;
-      }
-
-      const contentType = res.headers.get("content-type") || "";
-      const data = contentType.includes("application/json") ? await res.json() : await res.text();
-
-      if (!res.ok) {
-        // Token expiré → déconnexion automatique
-        if (res.status === 401) {
-          this.removeTokens();
-          window.dispatchEvent(new Event("auth:logout"));
-        }
-        // HTTP 429 — Trop de requêtes : ne pas faire crasher l'interface
-        if (res.status === 429) {
-          // Notifie l'UI sans lever d'exception fatale (le polling continue avec les dernières données)
-          window.dispatchEvent(new CustomEvent("api:rate-limited", {
-            detail: { endpoint, message: typeof data === "string" ? data : (data.error || "Trop de requêtes, veuillez patienter.") }
-          }));
-          // Retourne null pour les lectures (GET) → les fallbacks côté composants s'appliquent
-          if (options.method === "GET" || options.method === undefined) {
-            return null;
-          }
-          // Pour les écritures, on remonte l'erreur pour afficher le message
-          throw new Error(typeof data === "string" ? data : (data.error || "Trop de requêtes, réessayez dans quelques minutes."));
-        }
-        throw new Error(typeof data === "string" ? data : (data.error || data.message || `Erreur ${res.status}`));
-      }
-
-      return data;
-    } catch (err) {
-      if (err.name === "TypeError") {
-        throw new Error("Impossible de joindre le serveur. Vérifiez votre connexion.");
-      }
-      throw err;
-    }
+    return apiFetch(endpoint, options);
   }
 
   get(url, params)      { return this.request(url + (params ? "?" + new URLSearchParams(params) : ""), { method: "GET" }); }
@@ -130,7 +87,7 @@ export const Livreurs = {
 export const Admin = {
   stats:         ()          => api.get("/admin/stats"),
   drivers:       ()          => api.get("/admin/drivers"),
-  notifications: ()          => api.get("/admin/notifications"),
+  notifications: ()          => api.get("/notifications-secure"),
   financesMonthly:()         => api.get("/admin/finances/monthly"),
   vendorCategories:()         => api.get("/admin/vendor-categories"),
   settings:      ()          => api.get("/admin/settings"),
@@ -145,11 +102,11 @@ export const Admin = {
   addLieu:       (data)      => api.post("/admin/map-lieux", data),
   updateLieu:    (id, data)  => api.patch(`/admin/map-lieux/${id}`, data),
   deleteLieu:    (id)        => api.delete(`/admin/map-lieux/${id}`),
-  // Zones de livraison
-  zones:         ()          => api.get("/admin/zones"),
-  addZone:       (data)      => api.post("/admin/zones", data),
-  updateZone:    (id, data)  => api.patch(`/admin/zones/${id}`, data),
-  deleteZone:    (id)        => api.delete(`/admin/zones/${id}`),
+  // Zones de livraison — ROUTE SÉCURISÉE (JWT utilisateur + RLS, corrige 42501)
+  zones:         ()          => api.get("/zones-secure"),
+  addZone:       (data)      => api.post("/zones-secure", data),
+  updateZone:    (id, data)  => api.patch(`/zones-secure/${id}`, data),
+  deleteZone:    (id)        => api.delete(`/zones-secure/${id}`),
   // Catégories de produits
   categories:    ()          => api.get("/admin/categories"),
   addCategory:   (data)      => api.post("/admin/categories", data),
@@ -170,6 +127,7 @@ export const Payments = {
 
 export const Messages = {
   conversations: ()    => api.get("/messages/conversations"),
+  contacts:      ()    => api.get("/messages/contacts"),
   get:           (id)  => api.get(`/messages/${id}`),
   send:          (id, content) => api.post(`/messages/${id}/send`, { content }),
   start:         (subject, firstMessage) => api.post("/messages/start", { subject, firstMessage }),
